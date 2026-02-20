@@ -1,92 +1,47 @@
 import AppKit
-
-enum MenuBarTextFormatter {
-    static let idleText = "休息中"
-
-    static func runningText(remaining: TimeInterval) -> String {
-        format(remaining)
-    }
-
-    static func pausedText(remaining: TimeInterval) -> String {
-        "已暂停 \(format(remaining))"
-    }
-
-    private static func format(_ remaining: TimeInterval) -> String {
-        let seconds = max(0, Int(remaining.rounded(.down)))
-        return String(format: "%02d:%02d", seconds / 60, seconds % 60)
-    }
-}
-
-enum MenuBarDisplayState {
-    case idle
-    case running(remaining: TimeInterval)
-    case paused(remaining: TimeInterval)
-}
+import SwiftUI
 
 final class MenuBarController: NSObject {
     private var statusItem: NSStatusItem?
-    private var onStart: (() -> Void)?
-    private var onPause: (() -> Void)?
-    private var onResume: (() -> Void)?
-
-    private weak var startItem: NSMenuItem?
-    private weak var pauseItem: NSMenuItem?
-    private weak var resumeItem: NSMenuItem?
+    private let popover = NSPopover()
+    private let homeViewModel = HomeViewModel()
 
     var hasStatusItem: Bool { statusItem != nil }
 
     override init() {}
 
     func setup(
-        onStart: (() -> Void)? = nil,
-        onPause: (() -> Void)? = nil,
-        onResume: (() -> Void)? = nil
+        onPrimaryAction: (() -> Void)? = nil,
+        onOpenAbout: (() -> Void)? = nil,
+        onQuit: (() -> Void)? = nil,
+        onManualBreak: (() -> Void)? = nil,
+        onReset: (() -> Void)? = nil
     ) {
-        self.onStart = onStart
-        self.onPause = onPause
-        self.onResume = onResume
+        homeViewModel.onPrimaryAction = onPrimaryAction
+        homeViewModel.onOpenAbout = onOpenAbout
+        homeViewModel.onQuit = onQuit
+        homeViewModel.onManualBreak = onManualBreak
+        homeViewModel.onReset = onReset
 
         if statusItem == nil {
             statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         }
 
-        if let button = statusItem?.button {
-            let image = NSImage(systemSymbolName: "figure.walk", accessibilityDescription: "PauseNow")
-            image?.isTemplate = true
-            button.image = image
+        if let button = statusItem?.button, button.target == nil {
+            button.image = statusBarIcon()
             button.imagePosition = .imageLeading
             button.title = MenuBarTextFormatter.idleText
+            button.target = self
+            button.action = #selector(togglePopover)
         }
 
-        let menu = NSMenu()
-
-        let startItem = NSMenuItem(title: "开始", action: #selector(startTapped), keyEquivalent: "s")
-        startItem.target = self
-        menu.addItem(startItem)
-
-        let pauseItem = NSMenuItem(title: "暂停", action: #selector(pauseTapped), keyEquivalent: "p")
-        pauseItem.target = self
-        pauseItem.isEnabled = false
-        menu.addItem(pauseItem)
-
-        let resumeItem = NSMenuItem(title: "恢复", action: #selector(resumeTapped), keyEquivalent: "r")
-        resumeItem.target = self
-        resumeItem.isEnabled = false
-        menu.addItem(resumeItem)
-
-        menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "退出", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
-        statusItem?.menu = menu
-
-        self.startItem = startItem
-        self.pauseItem = pauseItem
-        self.resumeItem = resumeItem
+        popover.behavior = .transient
+        popover.contentSize = NSSize(width: 320, height: 360)
+        popover.contentViewController = NSHostingController(rootView: HomePopoverView(viewModel: homeViewModel))
     }
 
     func setRunningState(_ isRunning: Bool) {
-        startItem?.isEnabled = !isRunning
-        pauseItem?.isEnabled = isRunning
-        resumeItem?.isEnabled = false
+        _ = isRunning
     }
 
     func updateDisplayIdle() {
@@ -117,21 +72,32 @@ final class MenuBarController: NSObject {
         }
     }
 
+    func updateHome(displayState: MenuBarDisplayState, totalDuration: TimeInterval) {
+        homeViewModel.apply(displayState: displayState, totalDuration: totalDuration)
+    }
+
     func setPausedState(_ isPaused: Bool) {
-        startItem?.isEnabled = !isPaused
-        pauseItem?.isEnabled = false
-        resumeItem?.isEnabled = isPaused
+        _ = isPaused
     }
 
-    @objc private func startTapped() {
-        onStart?()
+    private func statusBarIcon() -> NSImage? {
+        let fallbackNames = ["desktopcomputer", "display", "laptopcomputer"]
+        for name in fallbackNames {
+            if let image = NSImage(systemSymbolName: name, accessibilityDescription: "PauseNow") {
+                image.isTemplate = true
+                return image
+            }
+        }
+
+        return nil
     }
 
-    @objc private func pauseTapped() {
-        onPause?()
-    }
-
-    @objc private func resumeTapped() {
-        onResume?()
+    @objc private func togglePopover() {
+        guard let button = statusItem?.button else { return }
+        if popover.isShown {
+            popover.performClose(nil)
+        } else {
+            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        }
     }
 }

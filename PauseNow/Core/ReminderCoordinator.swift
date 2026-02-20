@@ -34,7 +34,7 @@ final class ReminderCoordinator {
         self.settingsStore = settingsStore
         self.smartMonitor = smartMonitor
         self.overlayPresenter = overlayPresenter
-        self.engine = RuleEngine(config: .default)
+        self.engine = RuleEngine(config: RuleConfig(standupEveryEyeBreaks: settingsStore.current.standupEveryEyeBreaks))
         let interval = TimeInterval(settingsStore.current.eyeBreakIntervalMinutes * 60)
         self.timerEngine = TimerEngine(config: TimerConfig(eyeBreakInterval: interval))
     }
@@ -52,6 +52,8 @@ final class ReminderCoordinator {
     func start() {
         switch state {
         case .stopped:
+            engine = makeRuleEngine()
+            timerEngine = makeTimerEngine()
             timerEngine.start()
             beginHeartbeatIfNeeded()
         case .paused:
@@ -60,6 +62,17 @@ final class ReminderCoordinator {
             return
         }
         state = .running
+    }
+
+    func togglePrimaryAction() {
+        switch state {
+        case .stopped:
+            start()
+        case .running:
+            pause()
+        case .paused:
+            resume()
+        }
     }
 
     func pause() {
@@ -81,24 +94,27 @@ final class ReminderCoordinator {
         guard let due = timerEngine.nextDueDate, currentDate >= due else { return }
 
         let event = engine.nextEvent(at: currentDate)
-        let settings = settingsStore.current
-        let duration = event.type == .eyeBreak ? settings.eyeBreakSeconds : settings.standupSeconds
+        present(eventType: event.type)
+    }
 
-        overlayInFlight = true
-        overlayPresenter.present(
-            event: event.type,
-            durationSeconds: duration,
-            onSkip: { [weak self] in
-                self?.overlayInFlight = false
-                self?.timerEngine.start()
-            },
-            onComplete: { [weak self] in
-                guard let self else { return }
-                self.engine.markCompleted(event.type)
-                self.overlayInFlight = false
-                self.timerEngine.start()
-            }
-        )
+    func manualBreakByCycle(now: Date = Date()) {
+        guard !overlayInFlight else { return }
+        if state == .stopped {
+            engine = makeRuleEngine()
+            timerEngine = makeTimerEngine()
+            beginHeartbeatIfNeeded()
+            state = .running
+        }
+
+        let event = engine.nextEvent(at: now)
+        present(eventType: event.type)
+    }
+
+    func resetSchedule() {
+        state = .stopped
+        overlayInFlight = false
+        engine = makeRuleEngine()
+        timerEngine = makeTimerEngine()
     }
 
     private func beginHeartbeatIfNeeded() {
@@ -111,5 +127,38 @@ final class ReminderCoordinator {
         }
         timer.resume()
         heartbeat = timer
+    }
+
+    private func present(eventType: ReminderType) {
+        let settings = settingsStore.current
+        let duration = eventType == .eyeBreak ? settings.eyeBreakSeconds : settings.standupSeconds
+
+        overlayInFlight = true
+        overlayPresenter.present(
+            event: eventType,
+            durationSeconds: duration,
+            onSkip: { [weak self] in
+                guard let self else { return }
+                self.overlayInFlight = false
+                self.timerEngine = self.makeTimerEngine()
+                self.timerEngine.start()
+            },
+            onComplete: { [weak self] in
+                guard let self else { return }
+                self.engine.markCompleted(eventType)
+                self.overlayInFlight = false
+                self.timerEngine = self.makeTimerEngine()
+                self.timerEngine.start()
+            }
+        )
+    }
+
+    private func makeRuleEngine() -> RuleEngine {
+        RuleEngine(config: RuleConfig(standupEveryEyeBreaks: settingsStore.current.standupEveryEyeBreaks))
+    }
+
+    private func makeTimerEngine() -> TimerEngine {
+        let interval = TimeInterval(settingsStore.current.eyeBreakIntervalMinutes * 60)
+        return TimerEngine(config: TimerConfig(eyeBreakInterval: interval))
     }
 }

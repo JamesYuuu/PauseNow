@@ -20,14 +20,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         menuBarController.setup(
-            onStart: { [weak self] in
-                self?.handleStart()
+            onPrimaryAction: { [weak self] in
+                self?.handlePrimaryAction()
             },
-            onPause: { [weak self] in
-                self?.handlePause()
+            onOpenAbout: { [weak self] in
+                self?.openAbout()
             },
-            onResume: { [weak self] in
-                self?.handleResume()
+            onQuit: {
+                NSApp.terminate(nil)
+            },
+            onManualBreak: { [weak self] in
+                self?.handleManualBreak()
+            },
+            onReset: { [weak self] in
+                self?.handleReset()
             }
         )
 
@@ -63,30 +69,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func refreshStatusDisplay() {
-        menuBarController.updateDisplay(state: currentDisplayState())
+        let displayState = currentDisplayState()
+        menuBarController.updateDisplay(state: displayState)
+        let totalDuration = TimeInterval(settingsStore.current.eyeBreakIntervalMinutes * 60)
+        menuBarController.updateHome(displayState: displayState, totalDuration: totalDuration)
     }
 
-    private func handleStart() {
-        coordinator.start()
-        menuBarController.setRunningState(true)
-        pausedRemaining = nil
-        refreshStatusDisplay()
-    }
-
-    private func handlePause() {
-        coordinator.pause()
-        menuBarController.setPausedState(true)
-        if let due = coordinator.nextDueDate {
+    private func handlePrimaryAction() {
+        if coordinator.state == .running, let due = coordinator.nextDueDate {
             pausedRemaining = max(0, due.timeIntervalSinceNow)
         }
+        coordinator.togglePrimaryAction()
+
+        if coordinator.state != .paused {
+            pausedRemaining = nil
+        }
+
         refreshStatusDisplay()
     }
 
-    private func handleResume() {
-        coordinator.resume()
-        menuBarController.setRunningState(true)
+    private func handleManualBreak() {
+        coordinator.manualBreakByCycle()
         pausedRemaining = nil
         refreshStatusDisplay()
+    }
+
+    private func handleReset() {
+        coordinator.resetSchedule()
+        pausedRemaining = nil
+        refreshStatusDisplay()
+    }
+
+    private func openAbout() {
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.orderFrontStandardAboutPanel(nil)
     }
 
     private func currentDisplayState() -> MenuBarDisplayState {

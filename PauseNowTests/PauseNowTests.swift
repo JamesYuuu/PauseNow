@@ -123,6 +123,34 @@ final class PauseNowTests: XCTestCase {
     }
 
     @MainActor
+    func testSettingsCanSaveEyeBreakAndStandupSeconds() {
+        let suite = "PauseNowTests.Durations"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let store = SettingsStore(userDefaults: defaults)
+        let viewModel = SettingsViewModel(store: store)
+
+        viewModel.saveDurations(eyeBreakSeconds: 30, standupSeconds: 240)
+
+        XCTAssertEqual(store.current.eyeBreakSeconds, 30)
+        XCTAssertEqual(store.current.standupSeconds, 240)
+    }
+
+    @MainActor
+    func testSettingsCanSaveIntervalAndStandupEvery() {
+        let suite = "PauseNowTests.IntervalAndCycle"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let store = SettingsStore(userDefaults: defaults)
+        let viewModel = SettingsViewModel(store: store)
+
+        viewModel.saveSchedule(eyeBreakIntervalMinutes: 25, standupEveryEyeBreaks: 4)
+
+        XCTAssertEqual(store.current.eyeBreakIntervalMinutes, 25)
+        XCTAssertEqual(store.current.standupEveryEyeBreaks, 4)
+    }
+
+    @MainActor
     func testRecordStoreAggregatesTodayStats() {
         let store = RecordStore()
         store.append(type: .eyeBreak, outcome: .completed, at: Date())
@@ -162,10 +190,135 @@ final class PauseNowTests: XCTestCase {
         coordinator.processTick(currentDate: currentTime)
         XCTAssertEqual(overlay.presentedCount, 1)
     }
+
+    @MainActor
+    func testCoordinatorToggleCyclesStartPauseResume() {
+        let defaults = UserDefaults(suiteName: "PauseNowTests.Toggle")!
+        defaults.removePersistentDomain(forName: "PauseNowTests.Toggle")
+        let settings = SettingsStore(userDefaults: defaults)
+        let coordinator = ReminderCoordinator(
+            settingsStore: settings,
+            smartMonitor: SmartModeMonitor(replayDelay: 15),
+            overlayPresenter: TestOverlayPresenter()
+        )
+
+        coordinator.togglePrimaryAction()
+        XCTAssertEqual(coordinator.state, .running)
+
+        coordinator.togglePrimaryAction()
+        XCTAssertEqual(coordinator.state, .paused)
+
+        coordinator.togglePrimaryAction()
+        XCTAssertEqual(coordinator.state, .running)
+    }
+
+    @MainActor
+    func testCoordinatorManualBreakUsesCycleRule() {
+        let defaults = UserDefaults(suiteName: "PauseNowTests.ManualBreak")!
+        defaults.removePersistentDomain(forName: "PauseNowTests.ManualBreak")
+        let settings = SettingsStore(userDefaults: defaults)
+        let overlay = TestOverlayPresenter()
+        let coordinator = ReminderCoordinator(
+            settingsStore: settings,
+            smartMonitor: SmartModeMonitor(replayDelay: 15),
+            overlayPresenter: overlay
+        )
+
+        coordinator.manualBreakByCycle()
+
+        XCTAssertEqual(overlay.presentedCount, 1)
+        XCTAssertEqual(overlay.lastEvent, .eyeBreak)
+    }
+
+    @MainActor
+    func testCoordinatorManualBreakUsesConfiguredStandupCycle() {
+        let suite = "PauseNowTests.ManualBreakCycle"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settingsStore = SettingsStore(userDefaults: defaults)
+        var settings = settingsStore.current
+        settings.standupEveryEyeBreaks = 2
+        settingsStore.save(settings)
+
+        let overlay = TestOverlayPresenter()
+        let coordinator = ReminderCoordinator(
+            settingsStore: settingsStore,
+            smartMonitor: SmartModeMonitor(replayDelay: 15),
+            overlayPresenter: overlay
+        )
+
+        coordinator.manualBreakByCycle()
+        coordinator.manualBreakByCycle()
+
+        XCTAssertEqual(overlay.presentedEvents, [.eyeBreak, .standup])
+    }
+
+    @MainActor
+    func testCoordinatorResetReturnsToStoppedBaseline() {
+        let defaults = UserDefaults(suiteName: "PauseNowTests.Reset")!
+        defaults.removePersistentDomain(forName: "PauseNowTests.Reset")
+        let settings = SettingsStore(userDefaults: defaults)
+        let coordinator = ReminderCoordinator(
+            settingsStore: settings,
+            smartMonitor: SmartModeMonitor(replayDelay: 15),
+            overlayPresenter: TestOverlayPresenter()
+        )
+
+        coordinator.start()
+        XCTAssertNotNil(coordinator.nextDueDate)
+
+        coordinator.resetSchedule()
+
+        XCTAssertEqual(coordinator.state, .stopped)
+        XCTAssertNil(coordinator.nextDueDate)
+    }
+
+    @MainActor
+    func testCoordinatorStartUsesConfiguredIntervalMinutes() {
+        let suite = "PauseNowTests.IntervalApplied"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settingsStore = SettingsStore(userDefaults: defaults)
+        var settings = settingsStore.current
+        settings.eyeBreakIntervalMinutes = 1
+        settingsStore.save(settings)
+
+        let coordinator = ReminderCoordinator(
+            settingsStore: settingsStore,
+            smartMonitor: SmartModeMonitor(replayDelay: 15),
+            overlayPresenter: TestOverlayPresenter()
+        )
+
+        coordinator.start()
+
+        guard let remaining = coordinator.nextDueDate?.timeIntervalSinceNow else {
+            return XCTFail("nextDueDate should not be nil")
+        }
+        XCTAssertGreaterThan(remaining, 50)
+        XCTAssertLessThan(remaining, 61)
+    }
+
+    @MainActor
+    func testHomeViewModelCanTriggerMenuActions() {
+        let viewModel = HomeViewModel()
+        var aboutCount = 0
+        var quitCount = 0
+
+        viewModel.onOpenAbout = { aboutCount += 1 }
+        viewModel.onQuit = { quitCount += 1 }
+
+        viewModel.openAbout()
+        viewModel.quitApp()
+
+        XCTAssertEqual(aboutCount, 1)
+        XCTAssertEqual(quitCount, 1)
+    }
 }
 
 private final class TestOverlayPresenter: ReminderOverlayPresenting {
     private(set) var presentedCount = 0
+    private(set) var lastEvent: ReminderType?
+    private(set) var presentedEvents: [ReminderType] = []
 
     func present(
         event: ReminderType,
@@ -174,6 +327,8 @@ private final class TestOverlayPresenter: ReminderOverlayPresenting {
         onComplete: @escaping () -> Void
     ) {
         presentedCount += 1
+        lastEvent = event
+        presentedEvents.append(event)
         onComplete()
     }
 }

@@ -37,4 +37,9 @@ final class TimerEngine {
         nextDueDate = currentDate.addingTimeInterval(pausedRemaining)
         self.pausedRemaining = nil
     }
+
+    func reset() {
+        nextDueDate = nil
+        pausedRemaining = nil
+    }
 }

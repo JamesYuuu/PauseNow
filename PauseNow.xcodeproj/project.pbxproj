@@ -6,9 +6,19 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXContainerItemProxy section */
+		A1B2C30A2F49000000D0C30D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 2FADE1772F487B5500D0C30D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 2FADE17E2F487B5500D0C30D;
+			remoteInfo = PauseNow;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		2FADE17F2F487B5500D0C30D /* PauseNow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PauseNow.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		A1B2C3012F49000000D0C30D /* PauseNowTests.xctest */ = {isa = PBXFileReference; explicitFileType = "wrapper.cfbundle"; includeInIndex = 0; path = PauseNowTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1B2C3012F49000000D0C30D /* PauseNowTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PauseNowTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -23,16 +33,6 @@
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
-
-/* Begin PBXContainerItemProxy section */
-		A1B2C30A2F49000000D0C30D /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 2FADE1772F487B5500D0C30D /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 2FADE17E2F487B5500D0C30D;
-			remoteInfo = PauseNow;
-		};
-/* End PBXContainerItemProxy section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		2FADE17C2F487B5500D0C30D /* Frameworks */ = {
@@ -120,14 +120,6 @@
 		};
 /* End PBXNativeTarget section */
 
-/* Begin PBXTargetDependency section */
-		A1B2C30B2F49000000D0C30D /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 2FADE17E2F487B5500D0C30D /* PauseNow */;
-			targetProxy = A1B2C30A2F49000000D0C30D /* PBXContainerItemProxy */;
-		};
-/* End PBXTargetDependency section */
-
 /* Begin PBXProject section */
 		2FADE1772F487B5500D0C30D /* Project object */ = {
 			isa = PBXProject;
@@ -198,6 +190,14 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A1B2C30B2F49000000D0C30D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 2FADE17E2F487B5500D0C30D /* PauseNow */;
+			targetProxy = A1B2C30A2F49000000D0C30D /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		2FADE1882F487B5600D0C30D /* Debug */ = {
