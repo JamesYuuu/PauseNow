@@ -21,25 +21,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         menuBarController.setup(
             onStart: { [weak self] in
-                self?.coordinator.start()
-                self?.menuBarController.setRunningState(true)
-                self?.pausedRemaining = nil
-                self?.refreshStatusDisplay()
+                self?.handleStart()
             },
             onPause: { [weak self] in
-                guard let self else { return }
-                self.coordinator.pause()
-                self.menuBarController.setPausedState(true)
-                if let due = self.coordinator.nextDueDate {
-                    self.pausedRemaining = max(0, due.timeIntervalSinceNow)
-                }
-                self.refreshStatusDisplay()
+                self?.handlePause()
             },
             onResume: { [weak self] in
-                self?.coordinator.resume()
-                self?.menuBarController.setRunningState(true)
-                self?.pausedRemaining = nil
-                self?.refreshStatusDisplay()
+                self?.handleResume()
             }
         )
 
@@ -75,17 +63,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func refreshStatusDisplay() {
+        menuBarController.updateDisplay(state: currentDisplayState())
+    }
+
+    private func handleStart() {
+        coordinator.start()
+        menuBarController.setRunningState(true)
+        pausedRemaining = nil
+        refreshStatusDisplay()
+    }
+
+    private func handlePause() {
+        coordinator.pause()
+        menuBarController.setPausedState(true)
+        if let due = coordinator.nextDueDate {
+            pausedRemaining = max(0, due.timeIntervalSinceNow)
+        }
+        refreshStatusDisplay()
+    }
+
+    private func handleResume() {
+        coordinator.resume()
+        menuBarController.setRunningState(true)
+        pausedRemaining = nil
+        refreshStatusDisplay()
+    }
+
+    private func currentDisplayState() -> MenuBarDisplayState {
         switch coordinator.state {
         case .stopped:
-            menuBarController.updateDisplayIdle()
+            return .idle
         case .running:
-            if let due = coordinator.nextDueDate {
-                menuBarController.updateDisplayRunning(remaining: max(0, due.timeIntervalSinceNow))
-            } else {
-                menuBarController.updateDisplayIdle()
-            }
+            guard let due = coordinator.nextDueDate else { return .idle }
+            return .running(remaining: max(0, due.timeIntervalSinceNow))
         case .paused:
-            menuBarController.updateDisplayPaused(remaining: pausedRemaining ?? 0)
+            return .paused(remaining: pausedRemaining ?? 0)
         }
     }
 

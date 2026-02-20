@@ -17,6 +17,12 @@ enum MenuBarTextFormatter {
     }
 }
 
+enum MenuBarDisplayState {
+    case idle
+    case running(remaining: TimeInterval)
+    case paused(remaining: TimeInterval)
+}
+
 final class MenuBarController: NSObject {
     private var statusItem: NSStatusItem?
     private var onStart: (() -> Void)?
@@ -84,20 +90,28 @@ final class MenuBarController: NSObject {
     }
 
     func updateDisplayIdle() {
-        DispatchQueue.main.async { [weak self] in
-            self?.statusItem?.button?.title = MenuBarTextFormatter.idleText
-        }
+        updateDisplay(state: .idle)
     }
 
     func updateDisplayRunning(remaining: TimeInterval) {
-        let title = MenuBarTextFormatter.runningText(remaining: remaining)
-        DispatchQueue.main.async { [weak self] in
-            self?.statusItem?.button?.title = title
-        }
+        updateDisplay(state: .running(remaining: remaining))
     }
 
     func updateDisplayPaused(remaining: TimeInterval) {
-        let title = MenuBarTextFormatter.pausedText(remaining: remaining)
+        updateDisplay(state: .paused(remaining: remaining))
+    }
+
+    func updateDisplay(state: MenuBarDisplayState) {
+        let title: String
+        switch state {
+        case .idle:
+            title = MenuBarTextFormatter.idleText
+        case let .running(remaining):
+            title = MenuBarTextFormatter.runningText(remaining: remaining)
+        case let .paused(remaining):
+            title = MenuBarTextFormatter.pausedText(remaining: remaining)
+        }
+
         DispatchQueue.main.async { [weak self] in
             self?.statusItem?.button?.title = title
         }
