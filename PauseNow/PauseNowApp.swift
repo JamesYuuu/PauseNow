@@ -1,17 +1,16 @@
-//
-//  PauseNowApp.swift
-//  PauseNow
-//
-//  Created by JamesYu on 2/20/26.
-//
-
 import SwiftUI
 
 @main
 struct PauseNowApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @State private var settingsStore = SettingsStore()
+
     var body: some Scene {
-        WindowGroup {
-            ContentView()
+        Settings {
+            let viewModel = SettingsViewModel(store: settingsStore)
+            SettingsView(initialPrompt: viewModel.promptText) { text in
+                viewModel.savePromptText(text)
+            }
         }
     }
 }
