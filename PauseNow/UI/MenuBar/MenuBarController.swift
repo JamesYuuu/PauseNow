@@ -72,8 +72,8 @@ final class MenuBarController: NSObject {
         }
     }
 
-    func updateHome(displayState: MenuBarDisplayState, totalDuration: TimeInterval) {
-        homeViewModel.apply(displayState: displayState, totalDuration: totalDuration)
+    func updateHome(model: HomeDisplayModel) {
+        homeViewModel.apply(model: model)
     }
 
     func setPausedState(_ isPaused: Bool) {

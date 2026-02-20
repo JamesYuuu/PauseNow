@@ -37,7 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         )
 
-        menuBarController.updateDisplayIdle()
+        refreshStatusDisplay()
         beginStatusTicker()
 
         subscribeSystemNotifications()
@@ -69,10 +69,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func refreshStatusDisplay() {
-        let displayState = currentDisplayState()
-        menuBarController.updateDisplay(state: displayState)
-        let totalDuration = TimeInterval(settingsStore.current.eyeBreakIntervalMinutes * 60)
-        menuBarController.updateHome(displayState: displayState, totalDuration: totalDuration)
+        let snapshot = ReminderDisplayMapper.build(
+            runtimeState: coordinator.state,
+            nextDueDate: coordinator.nextDueDate,
+            pausedRemaining: pausedRemaining,
+            settings: settingsStore.current,
+            now: Date()
+        )
+
+        menuBarController.updateDisplay(state: snapshot.menuBarState)
+        menuBarController.updateHome(model: snapshot.home)
     }
 
     private func handlePrimaryAction() {
@@ -103,18 +109,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func openAbout() {
         NSApp.activate(ignoringOtherApps: true)
         NSApp.orderFrontStandardAboutPanel(nil)
-    }
-
-    private func currentDisplayState() -> MenuBarDisplayState {
-        switch coordinator.state {
-        case .stopped:
-            return .idle
-        case .running:
-            guard let due = coordinator.nextDueDate else { return .idle }
-            return .running(remaining: max(0, due.timeIntervalSinceNow))
-        case .paused:
-            return .paused(remaining: pausedRemaining ?? 0)
-        }
     }
 
     private func subscribeSystemNotifications() {

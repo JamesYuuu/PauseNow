@@ -14,6 +14,52 @@ final class PauseNowTests: XCTestCase {
         XCTAssertEqual(MenuBarTextFormatter.pausedText(remaining: 125), "已暂停 02:05")
     }
 
+    func testDisplayMapperIdleUsesInitialInterval() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let snapshot = ReminderDisplayMapper.build(
+            runtimeState: .stopped,
+            nextDueDate: nil,
+            pausedRemaining: nil,
+            settings: .default,
+            now: now
+        )
+
+        XCTAssertEqual(snapshot.home.remainingText, "20:00")
+        XCTAssertEqual(snapshot.home.sandProgress, 1)
+        XCTAssertFalse(snapshot.home.isFlowing)
+    }
+
+    func testDisplayMapperRunningUsesDueDateRemaining() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let due = now.addingTimeInterval(90)
+        let snapshot = ReminderDisplayMapper.build(
+            runtimeState: .running,
+            nextDueDate: due,
+            pausedRemaining: nil,
+            settings: .default,
+            now: now
+        )
+
+        XCTAssertEqual(snapshot.home.remainingText, "01:30")
+        XCTAssertEqual(snapshot.home.sandProgress, 0.075, accuracy: 0.0001)
+        XCTAssertTrue(snapshot.home.isFlowing)
+    }
+
+    func testDisplayMapperPausedUsesPausedRemaining() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let snapshot = ReminderDisplayMapper.build(
+            runtimeState: .paused,
+            nextDueDate: nil,
+            pausedRemaining: 75,
+            settings: .default,
+            now: now
+        )
+
+        XCTAssertEqual(snapshot.home.remainingText, "01:15")
+        XCTAssertEqual(snapshot.home.sandProgress, 0.0625, accuracy: 0.0001)
+        XCTAssertFalse(snapshot.home.isFlowing)
+    }
+
     @MainActor
     func testRuleEnginePrefersStandupOnBoundary() {
         var engine = RuleEngine(config: .default)
