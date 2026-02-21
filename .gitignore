@@ -1,0 +1,23 @@
+# macOS
+.DS_Store
+
+# Xcode user and local state
+**/xcuserdata/
+*.xcuserstate
+*.xccheckout
+*.xcscmblueprint
+
+# Build artifacts
+DerivedData/
+build/
+
+# Swift Package Manager
+.build/
+Package.resolved
+
+# Local worktree directories
+.worktrees/
+worktrees/
+
+# Local planning docs (keep local, never commit)
+docs/plans/
