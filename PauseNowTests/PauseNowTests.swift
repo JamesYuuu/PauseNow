@@ -7,6 +7,7 @@ final class PauseNowTests: XCTestCase {
         XCTAssertEqual(MenuBarController.statusTextPointSize, 13)
         XCTAssertEqual(MenuBarController.statusIconPointSize, 15)
         XCTAssertEqual(MenuBarController.preferredStatusFontName, "font-maple-mono-nf-cn")
+        XCTAssertEqual(MenuBarController.fallbackStatusFontName, "Monaco")
     }
 
     @MainActor

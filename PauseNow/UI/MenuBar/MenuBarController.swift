@@ -6,6 +6,7 @@ final class MenuBarController: NSObject {
     static let statusTextPointSize: CGFloat = 13
     static let statusIconPointSize: CGFloat = 15
     static let preferredStatusFontName = "font-maple-mono-nf-cn"
+    static let fallbackStatusFontName = "Monaco"
 
     private var statusItem: NSStatusItem?
     private let popover = NSPopover()
@@ -86,6 +87,9 @@ final class MenuBarController: NSObject {
     private func statusTextFont() -> NSFont {
         if let customFont = NSFont(name: Self.preferredStatusFontName, size: Self.statusTextPointSize) {
             return customFont
+        }
+        if let fallbackFont = NSFont(name: Self.fallbackStatusFontName, size: Self.statusTextPointSize) {
+            return fallbackFont
         }
         return .monospacedDigitSystemFont(ofSize: Self.statusTextPointSize, weight: .semibold)
     }
