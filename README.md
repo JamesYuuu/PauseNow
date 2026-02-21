@@ -1,43 +1,78 @@
 # PauseNow
 
-PauseNow 是一个 macOS 菜单栏休息提醒应用（MVP）。
+[中文说明 (README.zh-CN.md)](README.zh-CN.md)
 
-## 当前能力
+PauseNow is a macOS menu bar break reminder app focused on the 20-20-20 workflow.
 
-- 20-20-20 护眼提醒（默认每 20 分钟，20 秒倒计时）
-- 每 3 次护眼触发起身提醒（默认 180 秒）
-- 全屏遮罩提醒（实时倒计时），支持跳过
-- 智能模式基础能力：系统睡眠/唤醒联动（全屏延后接线待补）
-- 本地配置（统计存储层已预置，主流程接线待补）
-- 菜单栏显示：图标 + 统一倒计时（始终 `mm:ss`）
-- 未开始时显示配置的初始时长；暂停时显示冻结的剩余时间
-- 菜单栏图标与倒计时字体已放大（中等档）
-- 菜单栏宽度自适应（不再固定长度）
-- 打开设置时会激活应用并将设置窗口置于前台
-- 设置修改立即生效；仅修改“单次休息间隔（分钟）”时会重置倒计时
-- 菜单栏动作已串联：开始 / 暂停 / 恢复 / 退出
-- App 图标资源已配置（Asset Catalog）
+## Highlights
 
-## 本地构建
+- Unified menu bar countdown (`mm:ss`) with hourglass popover controls
+- Primary action toggle flow: start -> pause -> resume
+- Manual break and reset actions from the popover
+- Official macOS Settings scene integration
+- Real-time settings updates (interval change resets schedule immediately)
+- Full-screen overlay reminder with countdown and skip support
+
+## Current Feature Status
+
+### Implemented
+
+- Eye-break reminder cadence (default: every 20 minutes for 20 seconds)
+- Stand-up reminder every N eye breaks (default: every 3 eye breaks for 180 seconds)
+- Runtime state mapping for menu bar + popover display (`stopped/running/paused` -> unified countdown)
+- Menu bar icon/text scaling and custom font fallback (`font-maple-mono-nf-cn` -> `Monaco` -> system fallback)
+- Settings persistence for prompt text, interval, durations, and stand-up frequency
+- Sleep/wake pause-resume hooks via `SmartModeMonitor`
+
+### Partially Wired / Not Wired Yet
+
+- Fullscreen defer path exists in `SmartModeMonitor` but fullscreen signal wiring is not completed
+- Custom prompt text is persisted, but overlay title still uses fixed copy
+- `RecordStore` and daily stats APIs exist, but are not fully connected to runtime reminder outcomes
+
+See [docs/feature-status.md](docs/feature-status.md) for a detailed matrix.
+
+## Quick Start
+
+### Requirements
+
+- macOS
+- Xcode 26.x or newer
+
+### Open in Xcode
+
+1. Open `PauseNow.xcodeproj`
+2. Select scheme `PauseNow`
+3. Run on `My Mac`
+
+## Build
 
 ```bash
 xcodebuild -project PauseNow.xcodeproj -scheme PauseNow -configuration Debug build
 ```
 
-## 本地测试
+## Test
 
 ```bash
 xcodebuild -project PauseNow.xcodeproj -scheme PauseNow -destination 'platform=macOS' test
 ```
 
-如果本机遇到签名阶段失败，可用下面命令做功能回归验证：
+If local signing causes test failures, use:
 
 ```bash
 xcodebuild -project PauseNow.xcodeproj -scheme PauseNow -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO test
 ```
 
-## 默认文案
+## Documentation Map
 
-- 提示语：`现在稍息！`
+- [README.zh-CN.md](README.zh-CN.md): Chinese README
+- [docs/release-checklist.md](docs/release-checklist.md): release and publishing checks
+- [docs/repository-structure.md](docs/repository-structure.md): codebase structure and flow guide
+- [docs/development.md](docs/development.md): local development workflow and troubleshooting
+- [docs/feature-status.md](docs/feature-status.md): implemented vs partial vs planned features
 
-可在设置页修改提示语（当前仅保存配置，提醒文案接线待补）。
+## Repository Hygiene
+
+- Keep `PauseNow.xcodeproj` tracked for reproducible builds.
+- Do not track user-private Xcode artifacts (`xcuserdata`, `*.xcuserstate`, etc.).
+- Keep local planning files under `docs/plans/` (ignored by `.gitignore`).
