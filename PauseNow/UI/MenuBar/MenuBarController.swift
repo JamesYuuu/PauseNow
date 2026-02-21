@@ -5,6 +5,7 @@ import SwiftUI
 final class MenuBarController: NSObject {
     static let statusTextPointSize: CGFloat = 13
     static let statusIconPointSize: CGFloat = 15
+    static let preferredStatusFontName = "font-maple-mono-nf-cn"
 
     private var statusItem: NSStatusItem?
     private let popover = NSPopover()
@@ -78,8 +79,15 @@ final class MenuBarController: NSObject {
     }
 
     private func configureStatusButtonAppearance(_ button: NSStatusBarButton) {
-        button.font = .systemFont(ofSize: Self.statusTextPointSize, weight: .semibold)
+        button.font = statusTextFont()
         button.image = statusBarIcon()
+    }
+
+    private func statusTextFont() -> NSFont {
+        if let customFont = NSFont(name: Self.preferredStatusFontName, size: Self.statusTextPointSize) {
+            return customFont
+        }
+        return .monospacedDigitSystemFont(ofSize: Self.statusTextPointSize, weight: .semibold)
     }
 
     @objc private func togglePopover() {

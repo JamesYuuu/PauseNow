@@ -6,6 +6,7 @@ final class PauseNowTests: XCTestCase {
     func testMenuBarControllerUsesExactMediumVisualConstants() {
         XCTAssertEqual(MenuBarController.statusTextPointSize, 13)
         XCTAssertEqual(MenuBarController.statusIconPointSize, 15)
+        XCTAssertEqual(MenuBarController.preferredStatusFontName, "font-maple-mono-nf-cn")
     }
 
     @MainActor
