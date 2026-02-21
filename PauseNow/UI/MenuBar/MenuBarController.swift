@@ -1,7 +1,12 @@
 import AppKit
 import SwiftUI
 
+@MainActor
 final class MenuBarController: NSObject {
+    static let statusTextPointSize: CGFloat = 13
+    static let statusIconPointSize: CGFloat = 15
+    static let fixedStatusItemLength: CGFloat = 124
+
     private var statusItem: NSStatusItem?
     private let popover = NSPopover()
     private let homeViewModel = HomeViewModel()
@@ -24,13 +29,14 @@ final class MenuBarController: NSObject {
         homeViewModel.onReset = onReset
 
         if statusItem == nil {
-            statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+            statusItem = NSStatusBar.system.statusItem(withLength: Self.fixedStatusItemLength)
         }
+        statusItem?.length = Self.fixedStatusItemLength
 
-        if let button = statusItem?.button, button.target == nil {
-            button.image = statusBarIcon()
+        if let button = statusItem?.button {
+            configureStatusButtonAppearance(button)
             button.imagePosition = .imageLeading
-            button.title = MenuBarTextFormatter.idleText
+            button.title = MenuBarTextFormatter.countdownText(remaining: 0)
             button.target = self
             button.action = #selector(togglePopover)
         }
@@ -40,56 +46,40 @@ final class MenuBarController: NSObject {
         popover.contentViewController = NSHostingController(rootView: HomePopoverView(viewModel: homeViewModel))
     }
 
-    func setRunningState(_ isRunning: Bool) {
-        _ = isRunning
-    }
-
-    func updateDisplayIdle() {
-        updateDisplay(state: .idle)
-    }
-
-    func updateDisplayRunning(remaining: TimeInterval) {
-        updateDisplay(state: .running(remaining: remaining))
-    }
-
-    func updateDisplayPaused(remaining: TimeInterval) {
-        updateDisplay(state: .paused(remaining: remaining))
-    }
-
     func updateDisplay(state: MenuBarDisplayState) {
         let title: String
         switch state {
-        case .idle:
-            title = MenuBarTextFormatter.idleText
-        case let .running(remaining):
-            title = MenuBarTextFormatter.runningText(remaining: remaining)
-        case let .paused(remaining):
-            title = MenuBarTextFormatter.pausedText(remaining: remaining)
+        case let .countdown(remaining):
+            title = MenuBarTextFormatter.countdownText(remaining: remaining)
         }
 
-        DispatchQueue.main.async { [weak self] in
-            self?.statusItem?.button?.title = title
-        }
+        statusItem?.button?.title = title
     }
 
     func updateHome(model: HomeDisplayModel) {
         homeViewModel.apply(model: model)
     }
 
-    func setPausedState(_ isPaused: Bool) {
-        _ = isPaused
-    }
-
     private func statusBarIcon() -> NSImage? {
+        let symbolConfiguration = NSImage.SymbolConfiguration(
+            pointSize: Self.statusIconPointSize,
+            weight: .semibold
+        )
         let fallbackNames = ["desktopcomputer", "display", "laptopcomputer"]
         for name in fallbackNames {
             if let image = NSImage(systemSymbolName: name, accessibilityDescription: "PauseNow") {
-                image.isTemplate = true
-                return image
+                let configuredImage = image.withSymbolConfiguration(symbolConfiguration) ?? image
+                configuredImage.isTemplate = true
+                return configuredImage
             }
         }
 
         return nil
+    }
+
+    private func configureStatusButtonAppearance(_ button: NSStatusBarButton) {
+        button.font = .systemFont(ofSize: Self.statusTextPointSize, weight: .semibold)
+        button.image = statusBarIcon()
     }
 
     @objc private func togglePopover() {

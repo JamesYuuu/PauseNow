@@ -2,29 +2,53 @@ import XCTest
 @testable import PauseNow
 
 final class PauseNowTests: XCTestCase {
-    func testMenuBarTextIdleIsResting() {
-        XCTAssertEqual(MenuBarTextFormatter.idleText, "休息中")
+    @MainActor
+    func testMenuBarControllerUsesExactMediumVisualConstants() {
+        XCTAssertEqual(MenuBarController.statusTextPointSize, 13)
+        XCTAssertEqual(MenuBarController.statusIconPointSize, 15)
+        XCTAssertEqual(MenuBarController.fixedStatusItemLength, 124)
     }
 
-    func testMenuBarTextRunningFormatsMMSS() {
-        XCTAssertEqual(MenuBarTextFormatter.runningText(remaining: 65), "01:05")
+    @MainActor
+    func testMenuBarControllerAppliesFixedStatusItemLengthOnSetup() {
+        let controller = MenuBarController()
+
+        controller.setup()
+
+        XCTAssertEqual(statusItemLength(for: controller), MenuBarController.fixedStatusItemLength)
     }
 
-    func testMenuBarTextPausedFormatsPrefixAndMMSS() {
-        XCTAssertEqual(MenuBarTextFormatter.pausedText(remaining: 125), "已暂停 02:05")
+    func testMenuBarTextFormatsCountdownOnly() {
+        let outputs = [
+            MenuBarTextFormatter.countdownText(remaining: 65),
+            MenuBarTextFormatter.countdownText(remaining: 125)
+        ]
+
+        XCTAssertEqual(outputs[0], "01:05")
+        XCTAssertEqual(outputs[1], "02:05")
+
+        for output in outputs {
+            XCTAssertNotNil(output.range(of: #"^\d{2}:\d{2}$"#, options: NSString.CompareOptions.regularExpression))
+        }
     }
 
-    func testDisplayMapperIdleUsesInitialInterval() {
+    func testDisplayMapperStoppedUsesCountdownState() {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
+        var settings = AppSettings.default
+        settings.eyeBreakIntervalMinutes = 25
         let snapshot = ReminderDisplayMapper.build(
             runtimeState: .stopped,
             nextDueDate: nil,
             pausedRemaining: nil,
-            settings: .default,
+            settings: settings,
             now: now
         )
 
-        XCTAssertEqual(snapshot.home.remainingText, "20:00")
+        guard case let .countdown(remaining) = snapshot.menuBarState else {
+            return XCTFail("menuBarState should use unified countdown state")
+        }
+        XCTAssertEqual(remaining, 25 * 60)
+        XCTAssertEqual(snapshot.home.remainingText, "25:00")
         XCTAssertEqual(snapshot.home.sandProgress, 1)
         XCTAssertFalse(snapshot.home.isFlowing)
     }
@@ -40,12 +64,16 @@ final class PauseNowTests: XCTestCase {
             now: now
         )
 
+        guard case let .countdown(remaining) = snapshot.menuBarState else {
+            return XCTFail("menuBarState should use unified countdown state")
+        }
+        XCTAssertEqual(remaining, 90)
         XCTAssertEqual(snapshot.home.remainingText, "01:30")
         XCTAssertEqual(snapshot.home.sandProgress, 0.075, accuracy: 0.0001)
         XCTAssertTrue(snapshot.home.isFlowing)
     }
 
-    func testDisplayMapperPausedUsesPausedRemaining() {
+    func testDisplayMapperPausedUsesCountdownState() {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         let snapshot = ReminderDisplayMapper.build(
             runtimeState: .paused,
@@ -55,6 +83,10 @@ final class PauseNowTests: XCTestCase {
             now: now
         )
 
+        guard case let .countdown(remaining) = snapshot.menuBarState else {
+            return XCTFail("menuBarState should use unified countdown state")
+        }
+        XCTAssertEqual(remaining, 75)
         XCTAssertEqual(snapshot.home.remainingText, "01:15")
         XCTAssertEqual(snapshot.home.sandProgress, 0.0625, accuracy: 0.0001)
         XCTAssertFalse(snapshot.home.isFlowing)
@@ -359,6 +391,16 @@ final class PauseNowTests: XCTestCase {
         XCTAssertEqual(aboutCount, 1)
         XCTAssertEqual(quitCount, 1)
     }
+}
+
+@MainActor
+private func statusItemLength(for controller: MenuBarController) -> CGFloat? {
+    let mirror = Mirror(reflecting: controller)
+    for child in mirror.children where child.label == "statusItem" {
+        guard let item = child.value as? NSStatusItem else { return nil }
+        return item.length
+    }
+    return nil
 }
 
 private final class TestOverlayPresenter: ReminderOverlayPresenting {

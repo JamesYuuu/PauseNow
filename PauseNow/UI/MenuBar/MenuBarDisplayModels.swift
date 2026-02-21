@@ -1,14 +1,8 @@
 import Foundation
 
 enum MenuBarTextFormatter {
-    static let idleText = "休息中"
-
-    static func runningText(remaining: TimeInterval) -> String {
+    static func countdownText(remaining: TimeInterval) -> String {
         format(remaining)
-    }
-
-    static func pausedText(remaining: TimeInterval) -> String {
-        "已暂停 \(format(remaining))"
     }
 
     private static func format(_ remaining: TimeInterval) -> String {
@@ -18,9 +12,7 @@ enum MenuBarTextFormatter {
 }
 
 enum MenuBarDisplayState {
-    case idle
-    case running(remaining: TimeInterval)
-    case paused(remaining: TimeInterval)
+    case countdown(remaining: TimeInterval)
 }
 
 struct HomeDisplayModel {
@@ -52,15 +44,15 @@ enum ReminderDisplayMapper {
         switch runtimeState {
         case .stopped:
             remaining = totalDuration
-            menuBarState = .idle
+            menuBarState = .countdown(remaining: remaining)
             isFlowing = false
         case .running:
             remaining = nextDueDate == nil ? totalDuration : runningRemaining
-            menuBarState = .running(remaining: remaining)
+            menuBarState = .countdown(remaining: remaining)
             isFlowing = true
         case .paused:
             remaining = max(0, pausedRemaining ?? totalDuration)
-            menuBarState = .paused(remaining: remaining)
+            menuBarState = .countdown(remaining: remaining)
             isFlowing = false
         }
 
@@ -72,7 +64,7 @@ enum ReminderDisplayMapper {
         }
 
         let home = HomeDisplayModel(
-            remainingText: MenuBarTextFormatter.runningText(remaining: remaining),
+            remainingText: MenuBarTextFormatter.countdownText(remaining: remaining),
             sandProgress: progress,
             isFlowing: isFlowing
         )
