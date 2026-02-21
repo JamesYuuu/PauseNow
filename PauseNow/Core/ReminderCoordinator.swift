@@ -117,6 +117,10 @@ final class ReminderCoordinator {
         timerEngine = makeTimerEngine()
     }
 
+    func applySettingsWithoutReset() {
+        engine.applyConfigWithoutReset(makeRuleConfig())
+    }
+
     private func beginHeartbeatIfNeeded() {
         guard heartbeat == nil else { return }
         let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .utility))
@@ -154,7 +158,11 @@ final class ReminderCoordinator {
     }
 
     private func makeRuleEngine() -> RuleEngine {
-        RuleEngine(config: RuleConfig(standupEveryEyeBreaks: settingsStore.current.standupEveryEyeBreaks))
+        RuleEngine(config: makeRuleConfig())
+    }
+
+    private func makeRuleConfig() -> RuleConfig {
+        RuleConfig(standupEveryEyeBreaks: settingsStore.current.standupEveryEyeBreaks)
     }
 
     private func makeTimerEngine() -> TimerEngine {

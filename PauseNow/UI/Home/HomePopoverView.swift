@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct HomePopoverView: View {
+    @Environment(\.openSettings) private var openSettings
     @ObservedObject var viewModel: HomeViewModel
 
     var body: some View {
@@ -11,8 +12,8 @@ struct HomePopoverView: View {
                     Button("关于 PauseNow") {
                         viewModel.openAbout()
                     }
-                    SettingsLink {
-                        Text("设置")
+                    Button("设置") {
+                        viewModel.openSettings(using: { openSettings() })
                     }
                     Divider()
                     Button("退出") {

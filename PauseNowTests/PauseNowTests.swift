@@ -6,16 +6,15 @@ final class PauseNowTests: XCTestCase {
     func testMenuBarControllerUsesExactMediumVisualConstants() {
         XCTAssertEqual(MenuBarController.statusTextPointSize, 13)
         XCTAssertEqual(MenuBarController.statusIconPointSize, 15)
-        XCTAssertEqual(MenuBarController.fixedStatusItemLength, 124)
     }
 
     @MainActor
-    func testMenuBarControllerAppliesFixedStatusItemLengthOnSetup() {
+    func testMenuBarControllerUsesVariableLengthStatusItem() {
         let controller = MenuBarController()
 
         controller.setup()
 
-        XCTAssertEqual(statusItemLength(for: controller), MenuBarController.fixedStatusItemLength)
+        XCTAssertEqual(statusItemLength(for: controller), NSStatusItem.variableLength)
     }
 
     func testMenuBarTextFormatsCountdownOnly() {
@@ -228,6 +227,69 @@ final class PauseNowTests: XCTestCase {
         XCTAssertEqual(store.current.standupEveryEyeBreaks, 4)
     }
 
+    func testSettingsStoreSavePostsDidChangeNotification() {
+        let suite = "PauseNowTests.SettingsNotification"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let store = SettingsStore(userDefaults: defaults)
+
+        let expectation = expectation(description: "settings change notification")
+        var capturedOld: AppSettings?
+        var capturedNew: AppSettings?
+
+        let token = NotificationCenter.default.addObserver(
+            forName: .settingsDidChange,
+            object: store,
+            queue: nil
+        ) { notification in
+            let payload = SettingsStore.settingsDidChangePayload(from: notification)
+            capturedOld = payload?.oldSettings
+            capturedNew = payload?.newSettings
+            expectation.fulfill()
+        }
+
+        var updated = store.current
+        updated.defaultPromptText = "Notification Test"
+        store.save(updated)
+
+        wait(for: [expectation], timeout: 1.0)
+        NotificationCenter.default.removeObserver(token)
+
+        XCTAssertEqual(capturedOld?.defaultPromptText, AppSettings.default.defaultPromptText)
+        XCTAssertEqual(capturedNew?.defaultPromptText, "Notification Test")
+    }
+
+    func testSettingsStoreCanExtractTypedPayloadFromNotification() {
+        let store = SettingsStore()
+        let old = AppSettings.default
+        var new = old
+        new.eyeBreakIntervalMinutes += 1
+
+        let notification = Notification(
+            name: .settingsDidChange,
+            object: store,
+            userInfo: [SettingsStore.UserInfoKey.payload: SettingsStore.SettingsDidChangePayload(oldSettings: old, newSettings: new)]
+        )
+
+        let payload = SettingsStore.settingsDidChangePayload(from: notification)
+
+        XCTAssertEqual(payload?.oldSettings.eyeBreakIntervalMinutes, old.eyeBreakIntervalMinutes)
+        XCTAssertEqual(payload?.newSettings.eyeBreakIntervalMinutes, new.eyeBreakIntervalMinutes)
+    }
+
+    func testSettingsResetPolicyOnlyTriggersOnIntervalChange() {
+        let old = AppSettings.default
+
+        var intervalChanged = old
+        intervalChanged.eyeBreakIntervalMinutes += 5
+
+        var promptChanged = old
+        promptChanged.defaultPromptText = "Only prompt changed"
+
+        XCTAssertTrue(SettingsResetPolicy.shouldReset(old: old, new: intervalChanged))
+        XCTAssertFalse(SettingsResetPolicy.shouldReset(old: old, new: promptChanged))
+    }
+
     @MainActor
     func testRecordStoreAggregatesTodayStats() {
         let store = RecordStore()
@@ -377,19 +439,76 @@ final class PauseNowTests: XCTestCase {
     }
 
     @MainActor
+    func testCoordinatorAppliesNonIntervalSettingsChangeWithoutReset() {
+        let suite = "PauseNowTests.NonIntervalRuntimeUpdate"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settingsStore = SettingsStore(userDefaults: defaults)
+        let overlay = TestOverlayPresenter()
+        let coordinator = ReminderCoordinator(
+            settingsStore: settingsStore,
+            smartMonitor: SmartModeMonitor(replayDelay: 15),
+            overlayPresenter: overlay
+        )
+
+        coordinator.start()
+        guard let firstDue = coordinator.nextDueDate else {
+            return XCTFail("nextDueDate should not be nil after start")
+        }
+
+        coordinator.processTick(currentDate: firstDue)
+        XCTAssertEqual(overlay.presentedEvents, [.eyeBreak])
+
+        guard let dueBeforeUpdate = coordinator.nextDueDate else {
+            return XCTFail("nextDueDate should remain scheduled after completion")
+        }
+
+        var updated = settingsStore.current
+        updated.standupEveryEyeBreaks = 2
+        settingsStore.save(updated)
+
+        coordinator.applySettingsWithoutReset()
+
+        XCTAssertEqual(coordinator.nextDueDate, dueBeforeUpdate)
+
+        coordinator.processTick(currentDate: dueBeforeUpdate)
+        XCTAssertEqual(overlay.presentedEvents, [.eyeBreak, .standup])
+    }
+
+    @MainActor
     func testHomeViewModelCanTriggerMenuActions() {
         let viewModel = HomeViewModel()
         var aboutCount = 0
+        var settingsCount = 0
         var quitCount = 0
 
         viewModel.onOpenAbout = { aboutCount += 1 }
+        viewModel.onOpenSettings = { settingsCount += 1 }
         viewModel.onQuit = { quitCount += 1 }
 
         viewModel.openAbout()
+        viewModel.openSettings()
         viewModel.quitApp()
 
         XCTAssertEqual(aboutCount, 1)
+        XCTAssertEqual(settingsCount, 1)
         XCTAssertEqual(quitCount, 1)
+    }
+
+    @MainActor
+    func testHomeViewModelOpenSettingsUsingRunsCallbacksInOrder() {
+        let viewModel = HomeViewModel()
+        var steps: [String] = []
+
+        viewModel.onOpenSettings = {
+            steps.append("prepare")
+        }
+
+        viewModel.openSettings(using: {
+            steps.append("open")
+        })
+
+        XCTAssertEqual(steps, ["prepare", "open"])
     }
 }
 

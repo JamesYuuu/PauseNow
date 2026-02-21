@@ -17,6 +17,17 @@ struct AppSettings: Codable {
 }
 
 final class SettingsStore {
+    struct SettingsDidChangePayload {
+        let oldSettings: AppSettings
+        let newSettings: AppSettings
+    }
+
+    enum UserInfoKey {
+        static let payload = "payload"
+    }
+
+    static let shared = SettingsStore()
+
     private let key = "pausenow.settings.v1"
     private let userDefaults: UserDefaults
     private let encoder = JSONEncoder()
@@ -28,6 +39,10 @@ final class SettingsStore {
         self.userDefaults = userDefaults
     }
 
+    static func settingsDidChangePayload(from notification: Notification) -> SettingsDidChangePayload? {
+        notification.userInfo?[UserInfoKey.payload] as? SettingsDidChangePayload
+    }
+
     var current: AppSettings {
         guard let data = userDefaults.data(forKey: key),
               let settings = try? decoder.decode(AppSettings.self, from: data) else {
@@ -37,7 +52,20 @@ final class SettingsStore {
     }
 
     func save(_ settings: AppSettings) {
+        let oldSettings = current
         guard let data = try? encoder.encode(settings) else { return }
         userDefaults.set(data, forKey: key)
+
+        NotificationCenter.default.post(
+            name: .settingsDidChange,
+            object: self,
+            userInfo: [
+                UserInfoKey.payload: SettingsDidChangePayload(oldSettings: oldSettings, newSettings: settings)
+            ]
+        )
     }
+}
+
+extension Notification.Name {
+    static let settingsDidChange = Notification.Name("PauseNow.settingsDidChange")
 }

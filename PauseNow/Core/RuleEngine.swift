@@ -1,7 +1,7 @@
 import Foundation
 
 struct RuleEngine {
-    private let config: RuleConfig
+    private var config: RuleConfig
     private var completedEyeBreaksInCurrentCycle: Int
 
     init(config: RuleConfig) {
@@ -12,6 +12,10 @@ struct RuleEngine {
     mutating func markEyeBreakCompleted(times: Int = 1) {
         guard times > 0 else { return }
         completedEyeBreaksInCurrentCycle += times
+    }
+
+    mutating func applyConfigWithoutReset(_ config: RuleConfig) {
+        self.config = config
     }
 
     func nextEvent(at now: Date) -> ReminderEvent {

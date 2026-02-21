@@ -9,6 +9,7 @@ final class HomeViewModel: ObservableObject {
 
     var onPrimaryAction: (() -> Void)?
     var onOpenAbout: (() -> Void)?
+    var onOpenSettings: (() -> Void)?
     var onQuit: (() -> Void)?
     var onManualBreak: (() -> Void)?
     var onReset: (() -> Void)?
@@ -27,6 +28,15 @@ final class HomeViewModel: ObservableObject {
 
     func openAbout() {
         onOpenAbout?()
+    }
+
+    func openSettings() {
+        onOpenSettings?()
+    }
+
+    func openSettings(using openSettingsAction: () -> Void) {
+        onOpenSettings?()
+        openSettingsAction()
     }
 
     func quitApp() {

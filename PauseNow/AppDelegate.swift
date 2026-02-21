@@ -1,10 +1,16 @@
 import AppKit
 import Foundation
 
+struct SettingsResetPolicy {
+    static func shouldReset(old: AppSettings, new: AppSettings) -> Bool {
+        old.eyeBreakIntervalMinutes != new.eyeBreakIntervalMinutes
+    }
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let menuBarController = MenuBarController()
     private let overlayController = OverlayWindowController()
-    private let settingsStore = SettingsStore()
+    private let settingsStore = SettingsStore.shared
     private let smartModeMonitor = SmartModeMonitor(replayDelay: 15)
 
     private lazy var coordinator = ReminderCoordinator(
@@ -15,6 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var sleepObserver: NSObjectProtocol?
     private var wakeObserver: NSObjectProtocol?
+    private var settingsObserver: NSObjectProtocol?
     private var statusTicker: DispatchSourceTimer?
     private var pausedRemaining: TimeInterval?
 
@@ -25,6 +32,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             },
             onOpenAbout: { [weak self] in
                 self?.openAbout()
+            },
+            onOpenSettings: { [weak self] in
+                self?.prepareForSettingsOpen()
             },
             onQuit: {
                 NSApp.terminate(nil)
@@ -41,6 +51,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         beginStatusTicker()
 
         subscribeSystemNotifications()
+        subscribeSettingsNotifications()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -49,6 +60,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if let wakeObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver)
+        }
+        if let settingsObserver {
+            NotificationCenter.default.removeObserver(settingsObserver)
         }
         if let statusTicker {
             statusTicker.setEventHandler {}
@@ -111,6 +125,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.orderFrontStandardAboutPanel(nil)
     }
 
+    private func prepareForSettingsOpen() {
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
     private func subscribeSystemNotifications() {
         sleepObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.willSleepNotification,
@@ -127,5 +145,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ) { [weak self] _ in
             self?.smartModeMonitor.setSystemSleeping(false)
         }
+    }
+
+    private func subscribeSettingsNotifications() {
+        settingsObserver = NotificationCenter.default.addObserver(
+            forName: .settingsDidChange,
+            object: settingsStore,
+            queue: .main
+        ) { [weak self] notification in
+            self?.handleSettingsDidChange(notification)
+        }
+    }
+
+    private func handleSettingsDidChange(_ notification: Notification) {
+        guard let payload = SettingsStore.settingsDidChangePayload(from: notification) else {
+            refreshStatusDisplay()
+            return
+        }
+
+        if SettingsResetPolicy.shouldReset(old: payload.oldSettings, new: payload.newSettings) {
+            coordinator.resetSchedule()
+            pausedRemaining = nil
+        } else {
+            coordinator.applySettingsWithoutReset()
+        }
+
+        refreshStatusDisplay()
     }
 }

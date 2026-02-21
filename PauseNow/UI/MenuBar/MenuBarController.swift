@@ -5,7 +5,6 @@ import SwiftUI
 final class MenuBarController: NSObject {
     static let statusTextPointSize: CGFloat = 13
     static let statusIconPointSize: CGFloat = 15
-    static let fixedStatusItemLength: CGFloat = 124
 
     private var statusItem: NSStatusItem?
     private let popover = NSPopover()
@@ -18,20 +17,21 @@ final class MenuBarController: NSObject {
     func setup(
         onPrimaryAction: (() -> Void)? = nil,
         onOpenAbout: (() -> Void)? = nil,
+        onOpenSettings: (() -> Void)? = nil,
         onQuit: (() -> Void)? = nil,
         onManualBreak: (() -> Void)? = nil,
         onReset: (() -> Void)? = nil
     ) {
         homeViewModel.onPrimaryAction = onPrimaryAction
         homeViewModel.onOpenAbout = onOpenAbout
+        homeViewModel.onOpenSettings = onOpenSettings
         homeViewModel.onQuit = onQuit
         homeViewModel.onManualBreak = onManualBreak
         homeViewModel.onReset = onReset
 
         if statusItem == nil {
-            statusItem = NSStatusBar.system.statusItem(withLength: Self.fixedStatusItemLength)
+            statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         }
-        statusItem?.length = Self.fixedStatusItemLength
 
         if let button = statusItem?.button {
             configureStatusButtonAppearance(button)

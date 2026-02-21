@@ -3,7 +3,7 @@ import SwiftUI
 @main
 struct PauseNowApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @State private var settingsStore = SettingsStore()
+    @State private var settingsStore = SettingsStore.shared
 
     var body: some Scene {
         Settings {
