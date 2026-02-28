@@ -30,8 +30,8 @@ final class SettingsViewModel {
 
     func saveDurations(eyeBreakSeconds: Int, standupSeconds: Int) {
         let settings = store.update { settings in
-            settings.eyeBreakSeconds = Self.clampPositive(eyeBreakSeconds)
-            settings.standupSeconds = Self.clampPositive(standupSeconds)
+            settings.eyeBreakSeconds = eyeBreakSeconds
+            settings.standupSeconds = standupSeconds
         }
         self.eyeBreakSeconds = settings.eyeBreakSeconds
         self.standupSeconds = settings.standupSeconds
@@ -39,14 +39,10 @@ final class SettingsViewModel {
 
     func saveSchedule(eyeBreakIntervalMinutes: Int, standupEveryEyeBreaks: Int) {
         let settings = store.update { settings in
-            settings.eyeBreakIntervalMinutes = Self.clampPositive(eyeBreakIntervalMinutes)
-            settings.standupEveryEyeBreaks = Self.clampPositive(standupEveryEyeBreaks)
+            settings.eyeBreakIntervalMinutes = eyeBreakIntervalMinutes
+            settings.standupEveryEyeBreaks = standupEveryEyeBreaks
         }
         self.eyeBreakIntervalMinutes = settings.eyeBreakIntervalMinutes
         self.standupEveryEyeBreaks = settings.standupEveryEyeBreaks
-    }
-
-    private static func clampPositive(_ value: Int) -> Int {
-        max(1, value)
     }
 }

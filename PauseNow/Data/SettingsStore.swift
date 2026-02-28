@@ -34,11 +34,13 @@ final class SettingsStore {
     private let userDefaults: UserDefaults
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
+    private let logger: AppLogging
 
     nonisolated deinit {}
 
-    init(userDefaults: UserDefaults = .standard) {
+    init(userDefaults: UserDefaults = .standard, logger: AppLogging = ConsoleLogger()) {
         self.userDefaults = userDefaults
+        self.logger = logger
     }
 
     static func settingsDidChangePayload(from notification: Notification) -> SettingsDidChangePayload? {
@@ -50,19 +52,23 @@ final class SettingsStore {
               let settings = try? decoder.decode(AppSettings.self, from: data) else {
             return .default
         }
-        return settings
+        return SettingsValidator.sanitized(settings)
     }
 
     func save(_ settings: AppSettings) {
         let oldSettings = current
-        guard let data = try? encoder.encode(settings) else { return }
+        let newSettings = SettingsValidator.sanitized(settings)
+        guard let data = try? encoder.encode(newSettings) else { return }
         userDefaults.set(data, forKey: key)
+        logger.debug(
+            "settings: saved interval=\(newSettings.eyeBreakIntervalMinutes)m eye=\(newSettings.eyeBreakSeconds)s standupEvery=\(newSettings.standupEveryEyeBreaks) standup=\(newSettings.standupSeconds)s"
+        )
 
         NotificationCenter.default.post(
             name: .settingsDidChange,
             object: self,
             userInfo: [
-                UserInfoKey.payload: SettingsDidChangePayload(oldSettings: oldSettings, newSettings: settings)
+                UserInfoKey.payload: SettingsDidChangePayload(oldSettings: oldSettings, newSettings: newSettings)
             ]
         )
     }
