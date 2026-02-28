@@ -55,20 +55,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        if let sleepObserver {
-            NSWorkspace.shared.notificationCenter.removeObserver(sleepObserver)
-        }
-        if let wakeObserver {
-            NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver)
-        }
-        if let settingsObserver {
-            NotificationCenter.default.removeObserver(settingsObserver)
-        }
-        if let statusTicker {
-            statusTicker.setEventHandler {}
-            statusTicker.cancel()
-            self.statusTicker = nil
-        }
+        removeObservers()
+        stopStatusTicker()
     }
 
     private func beginStatusTicker() {
@@ -110,14 +98,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func handleManualBreak() {
         coordinator.manualBreakByCycle()
-        pausedRemaining = nil
-        refreshStatusDisplay()
+        clearPausedStateAndRefresh()
     }
 
     private func handleReset() {
         coordinator.resetSchedule()
-        pausedRemaining = nil
-        refreshStatusDisplay()
+        clearPausedStateAndRefresh()
     }
 
     private func openAbout() {
@@ -165,11 +151,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         if SettingsResetPolicy.shouldReset(old: payload.oldSettings, new: payload.newSettings) {
             coordinator.resetSchedule()
-            pausedRemaining = nil
+            clearPausedState()
         } else {
             coordinator.applySettingsWithoutReset()
         }
 
         refreshStatusDisplay()
+    }
+
+    private func clearPausedStateAndRefresh() {
+        clearPausedState()
+        refreshStatusDisplay()
+    }
+
+    private func clearPausedState() {
+        pausedRemaining = nil
+    }
+
+    private func removeObservers() {
+        if let sleepObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(sleepObserver)
+        }
+        if let wakeObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver)
+        }
+        if let settingsObserver {
+            NotificationCenter.default.removeObserver(settingsObserver)
+        }
+    }
+
+    private func stopStatusTicker() {
+        guard let statusTicker else { return }
+        statusTicker.setEventHandler {}
+        statusTicker.cancel()
+        self.statusTicker = nil
     }
 }

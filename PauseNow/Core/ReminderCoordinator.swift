@@ -52,9 +52,8 @@ final class ReminderCoordinator {
     func start() {
         switch state {
         case .stopped:
-            engine = makeRuleEngine()
-            timerEngine = makeTimerEngine()
-            timerEngine.start()
+            resetRuntime()
+            startNewTimer()
             beginHeartbeatIfNeeded()
         case .paused:
             timerEngine.resume()
@@ -100,8 +99,7 @@ final class ReminderCoordinator {
     func manualBreakByCycle(now: Date = Date()) {
         guard !overlayInFlight else { return }
         if state == .stopped {
-            engine = makeRuleEngine()
-            timerEngine = makeTimerEngine()
+            resetRuntime()
             beginHeartbeatIfNeeded()
             state = .running
         }
@@ -113,8 +111,7 @@ final class ReminderCoordinator {
     func resetSchedule() {
         state = .stopped
         overlayInFlight = false
-        engine = makeRuleEngine()
-        timerEngine = makeTimerEngine()
+        resetRuntime()
     }
 
     func applySettingsWithoutReset() {
@@ -143,16 +140,12 @@ final class ReminderCoordinator {
             durationSeconds: duration,
             onSkip: { [weak self] in
                 guard let self else { return }
-                self.overlayInFlight = false
-                self.timerEngine = self.makeTimerEngine()
-                self.timerEngine.start()
+                self.completeOverlayAndRestartTimer()
             },
             onComplete: { [weak self] in
                 guard let self else { return }
                 self.engine.markCompleted(eventType)
-                self.overlayInFlight = false
-                self.timerEngine = self.makeTimerEngine()
-                self.timerEngine.start()
+                self.completeOverlayAndRestartTimer()
             }
         )
     }
@@ -168,5 +161,20 @@ final class ReminderCoordinator {
     private func makeTimerEngine() -> TimerEngine {
         let interval = TimeInterval(settingsStore.current.eyeBreakIntervalMinutes * 60)
         return TimerEngine(config: TimerConfig(eyeBreakInterval: interval))
+    }
+
+    private func resetRuntime() {
+        engine = makeRuleEngine()
+        timerEngine = makeTimerEngine()
+    }
+
+    private func startNewTimer() {
+        timerEngine.start()
+    }
+
+    private func completeOverlayAndRestartTimer() {
+        overlayInFlight = false
+        timerEngine = makeTimerEngine()
+        timerEngine.start()
     }
 }

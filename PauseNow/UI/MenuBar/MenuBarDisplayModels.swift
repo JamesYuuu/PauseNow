@@ -38,21 +38,17 @@ enum ReminderDisplayMapper {
         let runningRemaining = max(0, (nextDueDate ?? now).timeIntervalSince(now))
 
         let remaining: TimeInterval
-        let menuBarState: MenuBarDisplayState
         let isFlowing: Bool
 
         switch runtimeState {
         case .stopped:
             remaining = totalDuration
-            menuBarState = .countdown(remaining: remaining)
             isFlowing = false
         case .running:
             remaining = nextDueDate == nil ? totalDuration : runningRemaining
-            menuBarState = .countdown(remaining: remaining)
             isFlowing = true
         case .paused:
             remaining = max(0, pausedRemaining ?? totalDuration)
-            menuBarState = .countdown(remaining: remaining)
             isFlowing = false
         }
 
@@ -69,6 +65,6 @@ enum ReminderDisplayMapper {
             isFlowing: isFlowing
         )
 
-        return DisplaySnapshot(menuBarState: menuBarState, home: home)
+        return DisplaySnapshot(menuBarState: .countdown(remaining: remaining), home: home)
     }
 }
