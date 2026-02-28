@@ -30,13 +30,9 @@ final class HomeViewModel: ObservableObject {
         onOpenAbout?()
     }
 
-    func openSettings() {
+    func openSettings(openSystemSettings: () -> Void) {
         onOpenSettings?()
-    }
-
-    func openSettings(using openSettingsAction: () -> Void) {
-        onOpenSettings?()
-        openSettingsAction()
+        openSystemSettings()
     }
 
     func quitApp() {
@@ -50,5 +46,4 @@ final class HomeViewModel: ObservableObject {
     func reset() {
         onReset?()
     }
-
 }

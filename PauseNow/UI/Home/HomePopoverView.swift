@@ -13,7 +13,7 @@ struct HomePopoverView: View {
                         viewModel.openAbout()
                     }
                     Button("设置") {
-                        viewModel.openSettings(using: { openSettings() })
+                        viewModel.openSettings(openSystemSettings: { openSettings() })
                     }
                     Divider()
                     Button("退出") {

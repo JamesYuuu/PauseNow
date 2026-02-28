@@ -489,7 +489,7 @@ final class PauseNowTests: XCTestCase {
         viewModel.onQuit = { quitCount += 1 }
 
         viewModel.openAbout()
-        viewModel.openSettings()
+        viewModel.openSettings(openSystemSettings: {})
         viewModel.quitApp()
 
         XCTAssertEqual(aboutCount, 1)
@@ -498,7 +498,7 @@ final class PauseNowTests: XCTestCase {
     }
 
     @MainActor
-    func testHomeViewModelOpenSettingsUsingRunsCallbacksInOrder() {
+    func testHomeViewModelOpenSettingsRunsCallbacksInOrder() {
         let viewModel = HomeViewModel()
         var steps: [String] = []
 
@@ -506,7 +506,7 @@ final class PauseNowTests: XCTestCase {
             steps.append("prepare")
         }
 
-        viewModel.openSettings(using: {
+        viewModel.openSettings(openSystemSettings: {
             steps.append("open")
         })
 
