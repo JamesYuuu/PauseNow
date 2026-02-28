@@ -22,27 +22,31 @@ final class SettingsViewModel {
     }
 
     func savePromptText(_ text: String) {
-        var settings = store.current
-        settings.defaultPromptText = text
-        store.save(settings)
+        store.update { settings in
+            settings.defaultPromptText = text
+        }
         promptText = text
     }
 
     func saveDurations(eyeBreakSeconds: Int, standupSeconds: Int) {
-        var settings = store.current
-        settings.eyeBreakSeconds = max(1, eyeBreakSeconds)
-        settings.standupSeconds = max(1, standupSeconds)
-        store.save(settings)
+        let settings = store.update { settings in
+            settings.eyeBreakSeconds = Self.clampPositive(eyeBreakSeconds)
+            settings.standupSeconds = Self.clampPositive(standupSeconds)
+        }
         self.eyeBreakSeconds = settings.eyeBreakSeconds
         self.standupSeconds = settings.standupSeconds
     }
 
     func saveSchedule(eyeBreakIntervalMinutes: Int, standupEveryEyeBreaks: Int) {
-        var settings = store.current
-        settings.eyeBreakIntervalMinutes = max(1, eyeBreakIntervalMinutes)
-        settings.standupEveryEyeBreaks = max(1, standupEveryEyeBreaks)
-        store.save(settings)
+        let settings = store.update { settings in
+            settings.eyeBreakIntervalMinutes = Self.clampPositive(eyeBreakIntervalMinutes)
+            settings.standupEveryEyeBreaks = Self.clampPositive(standupEveryEyeBreaks)
+        }
         self.eyeBreakIntervalMinutes = settings.eyeBreakIntervalMinutes
         self.standupEveryEyeBreaks = settings.standupEveryEyeBreaks
+    }
+
+    private static func clampPositive(_ value: Int) -> Int {
+        max(1, value)
     }
 }

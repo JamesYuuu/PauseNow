@@ -148,7 +148,7 @@ struct SettingsView: View {
         case .prompt:
             promptText = draftValue.trimmingCharacters(in: .whitespacesAndNewlines)
             if promptText.isEmpty {
-                promptText = "现在稍息！"
+                promptText = AppSettings.defaultPromptText
             }
         case .eyeBreakIntervalMinutes:
             eyeBreakIntervalMinutes = max(1, Int(draftValue) ?? eyeBreakIntervalMinutes)

@@ -9,12 +9,6 @@ struct ReminderRecord {
     let type: ReminderType
     let outcome: ReminderOutcome
     let timestamp: Date
-
-    init(type: ReminderType, outcome: ReminderOutcome, timestamp: Date) {
-        self.type = type
-        self.outcome = outcome
-        self.timestamp = timestamp
-    }
 }
 
 struct DailyStats {
@@ -37,9 +31,18 @@ final class RecordStore {
     }
 
     func todayStats(now: Date) -> DailyStats {
-        let today = records.filter { calendar.isDate($0.timestamp, inSameDayAs: now) }
-        let completed = today.filter { $0.outcome == .completed }.count
-        let skipped = today.filter { $0.outcome == .skipped }.count
-        return DailyStats(completedCount: completed, skippedCount: skipped)
+        var completedCount = 0
+        var skippedCount = 0
+
+        for record in records where calendar.isDate(record.timestamp, inSameDayAs: now) {
+            switch record.outcome {
+            case .completed:
+                completedCount += 1
+            case .skipped:
+                skippedCount += 1
+            }
+        }
+
+        return DailyStats(completedCount: completedCount, skippedCount: skippedCount)
     }
 }

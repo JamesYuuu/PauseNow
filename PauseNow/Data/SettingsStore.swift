@@ -1,6 +1,8 @@
 import Foundation
 
 struct AppSettings: Codable {
+    static let defaultPromptText = "现在稍息！"
+
     var eyeBreakIntervalMinutes: Int
     var eyeBreakSeconds: Int
     var standupEveryEyeBreaks: Int
@@ -12,7 +14,7 @@ struct AppSettings: Codable {
         eyeBreakSeconds: 20,
         standupEveryEyeBreaks: 3,
         standupSeconds: 180,
-        defaultPromptText: "现在稍息！"
+        defaultPromptText: AppSettings.defaultPromptText
     )
 }
 
@@ -63,6 +65,13 @@ final class SettingsStore {
                 UserInfoKey.payload: SettingsDidChangePayload(oldSettings: oldSettings, newSettings: settings)
             ]
         )
+    }
+
+    func update(_ mutate: (inout AppSettings) -> Void) -> AppSettings {
+        var settings = current
+        mutate(&settings)
+        save(settings)
+        return settings
     }
 }
 

@@ -8,11 +8,6 @@ enum ReminderType {
 struct ReminderEvent {
     let type: ReminderType
     let dueAt: Date
-
-    init(type: ReminderType, dueAt: Date) {
-        self.type = type
-        self.dueAt = dueAt
-    }
 }
 
 struct RuleConfig {
