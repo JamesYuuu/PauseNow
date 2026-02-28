@@ -24,12 +24,16 @@ final class MenuBarController: NSObject {
         onManualBreak: (() -> Void)? = nil,
         onReset: (() -> Void)? = nil
     ) {
-        homeViewModel.onPrimaryAction = onPrimaryAction
-        homeViewModel.onOpenAbout = onOpenAbout
-        homeViewModel.onOpenSettings = onOpenSettings
-        homeViewModel.onQuit = onQuit
-        homeViewModel.onManualBreak = onManualBreak
-        homeViewModel.onReset = onReset
+        homeViewModel.configure(
+            actions: HomeViewActions(
+                onPrimaryAction: onPrimaryAction,
+                onOpenAbout: onOpenAbout,
+                onOpenSettings: onOpenSettings,
+                onQuit: onQuit,
+                onManualBreak: onManualBreak,
+                onReset: onReset
+            )
+        )
 
         if statusItem == nil {
             statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)

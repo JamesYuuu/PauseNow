@@ -1,20 +1,37 @@
 import Foundation
 import Combine
 
+struct HomeViewActions {
+    let onPrimaryAction: (() -> Void)?
+    let onOpenAbout: (() -> Void)?
+    let onOpenSettings: (() -> Void)?
+    let onQuit: (() -> Void)?
+    let onManualBreak: (() -> Void)?
+    let onReset: (() -> Void)?
+
+    static let empty = HomeViewActions(
+        onPrimaryAction: nil,
+        onOpenAbout: nil,
+        onOpenSettings: nil,
+        onQuit: nil,
+        onManualBreak: nil,
+        onReset: nil
+    )
+}
+
 @MainActor
 final class HomeViewModel: ObservableObject {
     @Published var remainingText: String = "00:00"
     @Published var sandProgress: Double = 1
     @Published var isFlowing: Bool = false
 
-    var onPrimaryAction: (() -> Void)?
-    var onOpenAbout: (() -> Void)?
-    var onOpenSettings: (() -> Void)?
-    var onQuit: (() -> Void)?
-    var onManualBreak: (() -> Void)?
-    var onReset: (() -> Void)?
+    private var actions: HomeViewActions = .empty
 
     nonisolated deinit {}
+
+    func configure(actions: HomeViewActions) {
+        self.actions = actions
+    }
 
     func apply(model: HomeDisplayModel) {
         remainingText = model.remainingText
@@ -23,27 +40,27 @@ final class HomeViewModel: ObservableObject {
     }
 
     func triggerPrimaryAction() {
-        onPrimaryAction?()
+        actions.onPrimaryAction?()
     }
 
-    func openAbout() {
-        onOpenAbout?()
+    func triggerOpenAbout() {
+        actions.onOpenAbout?()
     }
 
-    func openSettings(openSystemSettings: () -> Void) {
-        onOpenSettings?()
+    func triggerOpenSettings(openSystemSettings: () -> Void) {
+        actions.onOpenSettings?()
         openSystemSettings()
     }
 
-    func quitApp() {
-        onQuit?()
+    func triggerQuit() {
+        actions.onQuit?()
     }
 
-    func takeBreakNow() {
-        onManualBreak?()
+    func triggerManualBreak() {
+        actions.onManualBreak?()
     }
 
-    func reset() {
-        onReset?()
+    func triggerReset() {
+        actions.onReset?()
     }
 }

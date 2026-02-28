@@ -10,14 +10,14 @@ struct HomePopoverView: View {
                 Spacer()
                 Menu {
                     Button("关于 PauseNow") {
-                        viewModel.openAbout()
+                        viewModel.triggerOpenAbout()
                     }
                     Button("设置") {
-                        viewModel.openSettings(openSystemSettings: { openSettings() })
+                        viewModel.triggerOpenSettings(openSystemSettings: { openSettings() })
                     }
                     Divider()
                     Button("退出") {
-                        viewModel.quitApp()
+                        viewModel.triggerQuit()
                     }
                 } label: {
                     Image(systemName: "gearshape.fill")
@@ -38,12 +38,12 @@ struct HomePopoverView: View {
 
             HStack(spacing: 10) {
                 Button("休息") {
-                    viewModel.takeBreakNow()
+                    viewModel.triggerManualBreak()
                 }
                 .buttonStyle(.bordered)
 
                 Button("重置") {
-                    viewModel.reset()
+                    viewModel.triggerReset()
                 }
                 .buttonStyle(.bordered)
             }
