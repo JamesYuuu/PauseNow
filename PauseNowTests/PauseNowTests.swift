@@ -334,6 +334,73 @@ final class PauseNowTests: XCTestCase {
     }
 
     @MainActor
+    func testCoordinatorSkipsTickWhenSystemSleeping() {
+        let suite = "PauseNowTests.SleepingSkipsTick"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = SettingsStore(userDefaults: defaults)
+        let smart = SmartModeMonitor(replayDelay: 15)
+        let overlay = TestOverlayPresenter()
+        let coordinator = ReminderCoordinator(
+            settingsStore: settings,
+            smartMonitor: smart,
+            overlayPresenter: overlay
+        )
+
+        coordinator.start()
+        guard let due = coordinator.nextDueDate else {
+            return XCTFail("nextDueDate should not be nil after start")
+        }
+
+        smart.setSystemSleeping(true)
+        coordinator.processTick(currentDate: due)
+        XCTAssertEqual(overlay.presentedCount, 0)
+    }
+
+    @MainActor
+    func testCoordinatorSkipsTickWhenFullscreenDeferred() {
+        let suite = "PauseNowTests.FullscreenSkipsTick"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = SettingsStore(userDefaults: defaults)
+        let smart = SmartModeMonitor(replayDelay: 15)
+        let overlay = TestOverlayPresenter()
+        let coordinator = ReminderCoordinator(
+            settingsStore: settings,
+            smartMonitor: smart,
+            overlayPresenter: overlay
+        )
+
+        coordinator.start()
+        guard let due = coordinator.nextDueDate else {
+            return XCTFail("nextDueDate should not be nil after start")
+        }
+
+        smart.setFullscreen(true)
+        coordinator.processTick(currentDate: due)
+        XCTAssertEqual(overlay.presentedCount, 0)
+    }
+
+    @MainActor
+    func testCoordinatorIgnoresManualBreakWhileOverlayInFlight() {
+        let suite = "PauseNowTests.ManualBreakInFlight"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = SettingsStore(userDefaults: defaults)
+        let overlay = TestOverlayPresenter(autoComplete: false)
+        let coordinator = ReminderCoordinator(
+            settingsStore: settings,
+            smartMonitor: SmartModeMonitor(replayDelay: 15),
+            overlayPresenter: overlay
+        )
+
+        coordinator.manualBreakByCycle()
+        coordinator.manualBreakByCycle()
+
+        XCTAssertEqual(overlay.presentedCount, 1)
+    }
+
+    @MainActor
     func testCoordinatorToggleCyclesStartPauseResume() {
         let defaults = UserDefaults(suiteName: "PauseNowTests.Toggle")!
         defaults.removePersistentDomain(forName: "PauseNowTests.Toggle")
@@ -484,13 +551,20 @@ final class PauseNowTests: XCTestCase {
         var settingsCount = 0
         var quitCount = 0
 
-        viewModel.onOpenAbout = { aboutCount += 1 }
-        viewModel.onOpenSettings = { settingsCount += 1 }
-        viewModel.onQuit = { quitCount += 1 }
+        viewModel.configure(
+            actions: HomeViewActions(
+                onPrimaryAction: nil,
+                onOpenAbout: { aboutCount += 1 },
+                onOpenSettings: { settingsCount += 1 },
+                onQuit: { quitCount += 1 },
+                onManualBreak: nil,
+                onReset: nil
+            )
+        )
 
-        viewModel.openAbout()
-        viewModel.openSettings(openSystemSettings: {})
-        viewModel.quitApp()
+        viewModel.triggerOpenAbout()
+        viewModel.triggerOpenSettings(openSystemSettings: {})
+        viewModel.triggerQuit()
 
         XCTAssertEqual(aboutCount, 1)
         XCTAssertEqual(settingsCount, 1)
@@ -502,15 +576,107 @@ final class PauseNowTests: XCTestCase {
         let viewModel = HomeViewModel()
         var steps: [String] = []
 
-        viewModel.onOpenSettings = {
-            steps.append("prepare")
-        }
+        viewModel.configure(
+            actions: HomeViewActions(
+                onPrimaryAction: nil,
+                onOpenAbout: nil,
+                onOpenSettings: {
+                    steps.append("prepare")
+                },
+                onQuit: nil,
+                onManualBreak: nil,
+                onReset: nil
+            )
+        )
 
-        viewModel.openSettings(openSystemSettings: {
+        viewModel.triggerOpenSettings(openSystemSettings: {
             steps.append("open")
         })
 
         XCTAssertEqual(steps, ["prepare", "open"])
+    }
+
+    @MainActor
+    func testAppDelegateSettingsChangeResetsOnlyOnIntervalChange() {
+        let suite = "PauseNowTests.AppDelegateSettingsChange"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settingsStore = SettingsStore(userDefaults: defaults)
+        let coordinator = FakeCoordinator()
+        let monitor = SmartModeMonitor(replayDelay: 15)
+        let appDelegate = AppDelegate(
+            settingsStore: settingsStore,
+            smartModeMonitor: monitor,
+            timeProvider: TestTimeProvider(now: Date(timeIntervalSince1970: 1_700_000_000)),
+            logger: NoopLogger(),
+            coordinator: coordinator
+        )
+
+        let old = AppSettings.default
+        var intervalChanged = old
+        intervalChanged.eyeBreakIntervalMinutes += 1
+        let intervalPayload = SettingsStore.SettingsDidChangePayload(oldSettings: old, newSettings: intervalChanged)
+        let intervalNotification = Notification(
+            name: .settingsDidChange,
+            object: settingsStore,
+            userInfo: [SettingsStore.UserInfoKey.payload: intervalPayload]
+        )
+        appDelegate.handleSettingsDidChange(intervalNotification)
+
+        XCTAssertEqual(coordinator.resetCalls, 1)
+        XCTAssertEqual(coordinator.applyWithoutResetCalls, 0)
+
+        var nonIntervalChanged = old
+        nonIntervalChanged.defaultPromptText = "new"
+        let nonIntervalPayload = SettingsStore.SettingsDidChangePayload(oldSettings: old, newSettings: nonIntervalChanged)
+        let nonIntervalNotification = Notification(
+            name: .settingsDidChange,
+            object: settingsStore,
+            userInfo: [SettingsStore.UserInfoKey.payload: nonIntervalPayload]
+        )
+        appDelegate.handleSettingsDidChange(nonIntervalNotification)
+
+        XCTAssertEqual(coordinator.resetCalls, 1)
+        XCTAssertEqual(coordinator.applyWithoutResetCalls, 1)
+    }
+
+    @MainActor
+    func testAppDelegateSleepWakeTogglesSmartMonitorPauseState() {
+        let monitor = SmartModeMonitor(replayDelay: 15)
+        let appDelegate = AppDelegate(
+            settingsStore: SettingsStore(userDefaults: UserDefaults(suiteName: "PauseNowTests.AppDelegateSleepWake")!),
+            smartModeMonitor: monitor,
+            timeProvider: TestTimeProvider(now: Date(timeIntervalSince1970: 1_700_000_000)),
+            logger: NoopLogger(),
+            coordinator: FakeCoordinator()
+        )
+
+        appDelegate.handleSystemSleepEvent()
+        XCTAssertTrue(monitor.isPausedBySystemState)
+
+        appDelegate.handleSystemWakeEvent()
+        XCTAssertFalse(monitor.isPausedBySystemState)
+    }
+
+    func testSettingsStoreSanitizesInvalidValuesOnSave() {
+        let suite = "PauseNowTests.SettingsSanitize"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let store = SettingsStore(userDefaults: defaults)
+        var invalid = AppSettings.default
+        invalid.eyeBreakIntervalMinutes = 0
+        invalid.eyeBreakSeconds = 0
+        invalid.standupEveryEyeBreaks = -1
+        invalid.standupSeconds = 0
+        invalid.defaultPromptText = "   "
+
+        store.save(invalid)
+
+        XCTAssertEqual(store.current.eyeBreakIntervalMinutes, 1)
+        XCTAssertEqual(store.current.eyeBreakSeconds, 1)
+        XCTAssertEqual(store.current.standupEveryEyeBreaks, 1)
+        XCTAssertEqual(store.current.standupSeconds, 1)
+        XCTAssertEqual(store.current.defaultPromptText, AppSettings.defaultPromptText)
     }
 }
 
@@ -528,6 +694,11 @@ private final class TestOverlayPresenter: ReminderOverlayPresenting {
     private(set) var presentedCount = 0
     private(set) var lastEvent: ReminderType?
     private(set) var presentedEvents: [ReminderType] = []
+    private let autoComplete: Bool
+
+    init(autoComplete: Bool = true) {
+        self.autoComplete = autoComplete
+    }
 
     func present(
         event: ReminderType,
@@ -538,6 +709,49 @@ private final class TestOverlayPresenter: ReminderOverlayPresenting {
         presentedCount += 1
         lastEvent = event
         presentedEvents.append(event)
-        onComplete()
+        if autoComplete {
+            onComplete()
+        }
     }
+}
+
+private final class FakeCoordinator: ReminderCoordinating {
+    var state: ReminderRuntimeState = .stopped
+    var nextDueDate: Date?
+    private(set) var toggleCalls = 0
+    private(set) var manualBreakCalls = 0
+    private(set) var resetCalls = 0
+    private(set) var applyWithoutResetCalls = 0
+
+    func togglePrimaryAction() {
+        toggleCalls += 1
+    }
+
+    func manualBreakByCycle(now: Date?) {
+        manualBreakCalls += 1
+    }
+
+    func resetSchedule() {
+        resetCalls += 1
+    }
+
+    func applySettingsWithoutReset() {
+        applyWithoutResetCalls += 1
+    }
+}
+
+private struct TestTimeProvider: TimeProviding {
+    let nowValue: Date
+
+    init(now: Date) {
+        self.nowValue = now
+    }
+
+    func now() -> Date {
+        nowValue
+    }
+}
+
+private struct NoopLogger: AppLogging {
+    func debug(_ message: String) {}
 }

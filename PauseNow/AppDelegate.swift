@@ -7,23 +7,62 @@ struct SettingsResetPolicy {
     }
 }
 
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private let menuBarController = MenuBarController()
-    private let overlayController = OverlayWindowController()
-    private let settingsStore = SettingsStore.shared
-    private let smartModeMonitor = SmartModeMonitor(replayDelay: 15)
+    private let menuBarController: MenuBarController
+    private let overlayController: OverlayWindowController
+    private let settingsStore: SettingsStore
+    private let smartModeMonitor: SmartModeMonitor
+    private let timeProvider: TimeProviding
+    private let logger: AppLogging
+    private let injectedCoordinator: ReminderCoordinating?
 
-    private lazy var coordinator = ReminderCoordinator(
+    private lazy var defaultCoordinator = ReminderCoordinator(
         settingsStore: settingsStore,
         smartMonitor: smartModeMonitor,
-        overlayPresenter: overlayController
+        overlayPresenter: overlayController,
+        timeProvider: timeProvider,
+        logger: logger
     )
+    private var coordinator: ReminderCoordinating {
+        injectedCoordinator ?? defaultCoordinator
+    }
 
     private var sleepObserver: NSObjectProtocol?
     private var wakeObserver: NSObjectProtocol?
     private var settingsObserver: NSObjectProtocol?
     private var statusTicker: DispatchSourceTimer?
     private var pausedRemaining: TimeInterval?
+
+    override init() {
+        self.menuBarController = MenuBarController()
+        self.overlayController = OverlayWindowController()
+        self.settingsStore = .shared
+        self.smartModeMonitor = SmartModeMonitor(replayDelay: 15)
+        self.timeProvider = SystemTimeProvider()
+        self.logger = ConsoleLogger()
+        self.injectedCoordinator = nil
+        super.init()
+    }
+
+    init(
+        menuBarController: MenuBarController? = nil,
+        overlayController: OverlayWindowController? = nil,
+        settingsStore: SettingsStore,
+        smartModeMonitor: SmartModeMonitor,
+        timeProvider: TimeProviding,
+        logger: AppLogging,
+        coordinator: ReminderCoordinating? = nil
+    ) {
+        self.menuBarController = menuBarController ?? MenuBarController()
+        self.overlayController = overlayController ?? OverlayWindowController()
+        self.settingsStore = settingsStore
+        self.smartModeMonitor = smartModeMonitor
+        self.timeProvider = timeProvider
+        self.logger = logger
+        self.injectedCoordinator = coordinator
+        super.init()
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         menuBarController.setup(
@@ -76,7 +115,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             nextDueDate: coordinator.nextDueDate,
             pausedRemaining: pausedRemaining,
             settings: settingsStore.current,
-            now: Date()
+            now: timeProvider.now()
         )
 
         menuBarController.updateDisplay(state: snapshot.menuBarState)
@@ -85,9 +124,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func handlePrimaryAction() {
         if coordinator.state == .running, let due = coordinator.nextDueDate {
-            pausedRemaining = max(0, due.timeIntervalSinceNow)
+            pausedRemaining = max(0, due.timeIntervalSince(timeProvider.now()))
         }
         coordinator.togglePrimaryAction()
+        logger.debug("app delegate: primary action toggled to \(String(describing: coordinator.state))")
 
         if coordinator.state != .paused {
             pausedRemaining = nil
@@ -97,13 +137,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func handleManualBreak() {
-        coordinator.manualBreakByCycle()
+        coordinator.manualBreakByCycle(now: timeProvider.now())
         clearPausedStateAndRefresh()
+        logger.debug("app delegate: manual break")
     }
 
     private func handleReset() {
         coordinator.resetSchedule()
         clearPausedStateAndRefresh()
+        logger.debug("app delegate: reset schedule")
     }
 
     private func openAbout() {
@@ -121,7 +163,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.smartModeMonitor.setSystemSleeping(true)
+            self?.handleSystemSleepEvent()
         }
 
         wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
@@ -129,7 +171,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.smartModeMonitor.setSystemSleeping(false)
+            self?.handleSystemWakeEvent()
         }
     }
 
@@ -143,7 +185,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func handleSettingsDidChange(_ notification: Notification) {
+    func handleSettingsDidChange(_ notification: Notification) {
         guard let payload = SettingsStore.settingsDidChangePayload(from: notification) else {
             refreshStatusDisplay()
             return
@@ -152,8 +194,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if SettingsResetPolicy.shouldReset(old: payload.oldSettings, new: payload.newSettings) {
             coordinator.resetSchedule()
             clearPausedState()
+            logger.debug("app delegate: settings changed interval, schedule reset")
         } else {
             coordinator.applySettingsWithoutReset()
+            logger.debug("app delegate: settings changed without interval reset")
         }
 
         refreshStatusDisplay()
@@ -166,6 +210,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func clearPausedState() {
         pausedRemaining = nil
+    }
+
+    func handleSystemSleepEvent() {
+        smartModeMonitor.setSystemSleeping(true)
+        logger.debug("app delegate: system sleep observed")
+    }
+
+    func handleSystemWakeEvent() {
+        smartModeMonitor.setSystemSleeping(false)
+        logger.debug("app delegate: system wake observed")
     }
 
     private func removeObservers() {
