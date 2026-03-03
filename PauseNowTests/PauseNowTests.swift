@@ -641,6 +641,74 @@ final class PauseNowTests: XCTestCase {
     }
 
     @MainActor
+    func testAppDelegatePausesCoordinatorOnSleepAndResumesOnWake() {
+        let monitor = SmartModeMonitor(replayDelay: 15)
+        let coordinator = FakeCoordinator()
+        coordinator.state = .running
+        coordinator.nextDueDate = Date(timeIntervalSince1970: 1_700_000_060)
+        let appDelegate = AppDelegate(
+            settingsStore: SettingsStore(userDefaults: UserDefaults(suiteName: "PauseNowTests.AppDelegateSleepPause")!),
+            smartModeMonitor: monitor,
+            timeProvider: TestTimeProvider(now: Date(timeIntervalSince1970: 1_700_000_000)),
+            logger: NoopLogger(),
+            coordinator: coordinator
+        )
+
+        appDelegate.handleSystemSleepEvent()
+        XCTAssertTrue(monitor.isPausedBySystemState)
+        XCTAssertEqual(coordinator.pauseCalls, 1)
+        XCTAssertEqual(coordinator.state, .paused)
+
+        appDelegate.handleSystemWakeEvent()
+        XCTAssertFalse(monitor.isPausedBySystemState)
+        XCTAssertEqual(coordinator.resumeCalls, 1)
+        XCTAssertEqual(coordinator.state, .running)
+    }
+
+    @MainActor
+    func testAppDelegateDoesNotResumeOnWakeIfNotPausedBySleep() {
+        let monitor = SmartModeMonitor(replayDelay: 15)
+        let coordinator = FakeCoordinator()
+        coordinator.state = .paused
+        let appDelegate = AppDelegate(
+            settingsStore: SettingsStore(userDefaults: UserDefaults(suiteName: "PauseNowTests.AppDelegateWakeNoPause")!),
+            smartModeMonitor: monitor,
+            timeProvider: TestTimeProvider(now: Date(timeIntervalSince1970: 1_700_000_000)),
+            logger: NoopLogger(),
+            coordinator: coordinator
+        )
+
+        // Wake without prior sleep-pause should not resume the coordinator
+        appDelegate.handleSystemWakeEvent()
+        XCTAssertEqual(coordinator.resumeCalls, 0)
+        XCTAssertEqual(coordinator.state, .paused)
+    }
+
+    @MainActor
+    func testAppDelegateDoesNotPauseCoordinatorOnSleepWhenAlreadyPaused() {
+        let monitor = SmartModeMonitor(replayDelay: 15)
+        let coordinator = FakeCoordinator()
+        coordinator.state = .paused
+        let appDelegate = AppDelegate(
+            settingsStore: SettingsStore(userDefaults: UserDefaults(suiteName: "PauseNowTests.AppDelegateSleepAlreadyPaused")!),
+            smartModeMonitor: monitor,
+            timeProvider: TestTimeProvider(now: Date(timeIntervalSince1970: 1_700_000_000)),
+            logger: NoopLogger(),
+            coordinator: coordinator
+        )
+
+        appDelegate.handleSystemSleepEvent()
+        XCTAssertTrue(monitor.isPausedBySystemState)
+        // Should not pause again if already paused
+        XCTAssertEqual(coordinator.pauseCalls, 0)
+
+        // Wake should not resume since sleep did not pause coordinator
+        appDelegate.handleSystemWakeEvent()
+        XCTAssertEqual(coordinator.resumeCalls, 0)
+        XCTAssertEqual(coordinator.state, .paused)
+    }
+
+    @MainActor
     func testAppDelegateSleepWakeTogglesSmartMonitorPauseState() {
         let monitor = SmartModeMonitor(replayDelay: 15)
         let appDelegate = AppDelegate(
@@ -719,12 +787,25 @@ private final class FakeCoordinator: ReminderCoordinating {
     var state: ReminderRuntimeState = .stopped
     var nextDueDate: Date?
     private(set) var toggleCalls = 0
+    private(set) var pauseCalls = 0
+    private(set) var resumeCalls = 0
     private(set) var manualBreakCalls = 0
     private(set) var resetCalls = 0
     private(set) var applyWithoutResetCalls = 0
 
     func togglePrimaryAction() {
         toggleCalls += 1
+    }
+
+    func pause() {
+        pauseCalls += 1
+        state = .paused
+    }
+
+    // Simplified: unconditionally transitions to .running to satisfy protocol contract.
+    func resume() {
+        resumeCalls += 1
+        state = .running
     }
 
     func manualBreakByCycle(now: Date?) {

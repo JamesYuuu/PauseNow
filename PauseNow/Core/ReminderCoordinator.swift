@@ -5,6 +5,8 @@ protocol ReminderCoordinating: AnyObject {
     var nextDueDate: Date? { get }
 
     func togglePrimaryAction()
+    func pause()
+    func resume()
     func manualBreakByCycle(now: Date?)
     func resetSchedule()
     func applySettingsWithoutReset()
