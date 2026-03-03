@@ -33,6 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsObserver: NSObjectProtocol?
     private var statusTicker: DispatchSourceTimer?
     private var pausedRemaining: TimeInterval?
+    private var pausedForSleep = false
 
     override init() {
         self.menuBarController = MenuBarController()
@@ -214,11 +215,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func handleSystemSleepEvent() {
         smartModeMonitor.setSystemSleeping(true)
+        if coordinator.state == .running {
+            if let due = coordinator.nextDueDate {
+                pausedRemaining = max(0, due.timeIntervalSince(timeProvider.now()))
+            }
+            coordinator.pause()
+            pausedForSleep = true
+        }
         logger.debug("app delegate: system sleep observed")
     }
 
     func handleSystemWakeEvent() {
         smartModeMonitor.setSystemSleeping(false)
+        if pausedForSleep {
+            coordinator.resume()
+            pausedForSleep = false
+            pausedRemaining = nil
+        }
         logger.debug("app delegate: system wake observed")
     }
 
